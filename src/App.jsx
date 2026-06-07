@@ -1,121 +1,56 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import LoginPage           from './pages/LoginPage.jsx'
+import DashboardPage       from './pages/DashboardPage.jsx'
+import BackofficeLoginPage from './pages/BackofficeLoginPage.jsx'
+import BackofficeHomePage  from './pages/BackofficeHomePage.jsx'
 
 function App() {
-  const [count, setCount] = useState(0)
+  // useState avec fonction d'initialisation : localStorage n'est lu qu'UNE fois,
+  // au tout premier rendu — ensuite "token" devient un véritable état React.
+  // Conséquence : toute mise à jour via setToken() déclenche un re-rendu de App,
+  // donc un recalcul de l'élément affiché par la route "/".
+  const [token, setToken] = useState(() => localStorage.getItem('access_token'))
+
+  // Même principe que "token", mais pour l'accès backoffice : un simple booléen
+  // (pas de vraie donnée à stocker, juste "le code a-t-il été validé ?").
+  // sessionStorage : survit aux rechargements de page MAIS pas à la fermeture
+  // de l'onglet — adapté à un accès "backoffice" qu'on ne veut pas garder ouvert
+  // indéfiniment, contrairement au token GLPI (localStorage, persistant).
+  const [backofficeUnlocked, setBackofficeUnlocked] = useState(
+    () => sessionStorage.getItem('backoffice_unlocked') === 'true'
+  )
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <Routes>
+      {/* onLogin permet à LoginPage de prévenir App qu'un token vient d'être obtenu */}
+      <Route path="/login" element={<LoginPage onLogin={setToken} />} />
 
-      <div className="ticks"></div>
+      {/* Page principale : protégée — redirige vers /login si pas de token.
+          "token" est maintenant réactif : dès que setToken change sa valeur,
+          React re-rend App et recalcule cet élément avec la nouvelle valeur. */}
+      <Route
+        path="/"
+        element={token ? <DashboardPage onLogout={() => setToken(null)} /> : <Navigate to="/login" replace />}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* Saisie du code d'accès backoffice — onUnlock = setBackofficeUnlocked(true) */}
+      <Route
+        path="/backoffice/login"
+        element={<BackofficeLoginPage onUnlock={() => setBackofficeUnlocked(true)} />}
+      />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      {/* Backoffice : protégé par le code unique — même schéma que la route "/" :
+          si "backofficeUnlocked" est false, on redirige vers la saisie du code. */}
+      <Route
+        path="/backoffice"
+        element={
+          backofficeUnlocked
+            ? <BackofficeHomePage onLock={() => setBackofficeUnlocked(false)} />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+    </Routes>
   )
 }
 

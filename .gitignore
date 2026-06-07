@@ -1,3 +1,10 @@
+# Secrets — ne jamais committer le client_secret OAuth2
+.env
+.env.*
+
+# Base de données SQLite locale (données, pas du code)
+data/
+
 # Logs
 logs
 *.log

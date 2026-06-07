@@ -1,0 +1,10 @@
+nom: NewApp
+client ID: 7f540689c280752e84db89dbf5cf42af418df5f79db79ddc721d029ae525f384 
+client secret: 4cd6a6bb3e9666001c31ef236883de47010a2f1f8ce3b8796d488ccd21500bc1
+
+l'url pour ouvrir le swagger est http://glpi.localhost/api.php/v2.3/doc
+nom: NewApp
+client ID: 24e3784d34e66090d11e5f6cdf92099f57b0d0c4bb426a4e9655a4d5b8483ff2 
+client secret: 08616e257b1b7160bf96bd1461cabccae77a95e15a883c53af3d10c992ee5606
+scopes: user, email, api
+grant: Code d'autorisation
