@@ -1,11 +1,23 @@
 import { useState, useEffect } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import Layout from '../../components/Layout.jsx'
+import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
+import './TicketDetailPage.css'
 
 // useParams() lit les segments dynamiques de l'URL définis dans App.jsx
 // (ex. "/backoffice/tickets/:id" → { id: "5" }). C'est l'équivalent React-Router
 // de récupérer un paramètre dans une route Express (req.params.id côté serveur).
-function BackofficeTicketDetailPage() {
+// onLock : même rôle que dans BackofficeHomePage — prévenir App que l'accès
+// backoffice doit être reverrouillé (le bouton apparaît dans la navbar partagée).
+function BackofficeTicketDetailPage({ onLock }) {
   const { id } = useParams()
+  const navigate = useNavigate()
+
+  function lock() {
+    sessionStorage.removeItem('backoffice_unlocked')
+    onLock()
+    navigate('/backoffice/login')
+  }
 
   const [ticket,  setTicket]  = useState(null)
   const [error,   setError]   = useState(null)
@@ -29,10 +41,16 @@ function BackofficeTicketDetailPage() {
         if (data.ok) {
           setTicket(data.ticket)
         } else {
-          setError(data.error)
+          // Le détail technique part dans la console — l'utilisateur ne voit
+          // qu'un message en texte clair (pas de JSON brut à l'écran).
+          console.error('Échec du chargement du ticket :', data.error)
+          setError(true)
         }
       } catch (err) {
-        if (!cancelled) setError(err.message)
+        if (!cancelled) {
+          console.error('Échec du chargement du ticket :', err.message)
+          setError(true)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -43,22 +61,28 @@ function BackofficeTicketDetailPage() {
   }, [id])
 
   return (
-    <div style={{ maxWidth: '900px', margin: '2rem auto', fontFamily: 'sans-serif' }}>
-      <p><Link to="/backoffice/tickets">← Retour à la liste des tickets</Link></p>
+    <Layout
+      title="Backoffice NewApp"
+      navLinks={BACKOFFICE_NAV_LINKS}
+      actionLabel="Verrouiller"
+      onAction={lock}
+    >
+    <div className="ticket-detail-page">
+      <p className="ticket-detail-page__back"><Link to="/backoffice/tickets">← Retour à la liste des tickets</Link></p>
 
       {loading && <p>Chargement…</p>}
 
       {error && (
-        <pre style={{ background: '#fee', padding: '1rem', overflowX: 'auto' }}>
-          {JSON.stringify(error, null, 2)}
-        </pre>
+        <p className="ticket-detail-page__error">
+          Impossible de charger ce ticket. Réessayez dans quelques instants.
+        </p>
       )}
 
       {ticket && (
         <>
           <h1>{ticket.name}</h1>
 
-          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', margin: '1rem 0' }}>
+          <div className="ticket-detail-page__meta">
             <p><strong>Type :</strong> {ticket.type}</p>
             <p><strong>Statut :</strong> {ticket.status}</p>
             <p><strong>Priorité :</strong> {ticket.priority}</p>
@@ -69,7 +93,7 @@ function BackofficeTicketDetailPage() {
           {/* whiteSpace: 'pre-wrap' : GLPI stocke le contenu avec des sauts de
               ligne ; sans cette règle CSS, le HTML les ignorerait et tout
               s'afficherait sur une seule ligne. */}
-          <p style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', whiteSpace: 'pre-wrap' }}>
+          <p className="ticket-detail-page__content">
             {ticket.content || '(aucune description)'}
           </p>
 
@@ -77,7 +101,7 @@ function BackofficeTicketDetailPage() {
           {ticket.items.length === 0 ? (
             <p>Aucun élément associé à ce ticket.</p>
           ) : (
-            <ul>
+            <ul className="ticket-detail-page__items">
               {ticket.items.map((item, index) => (
                 <li key={index}>{item.name} <em>({item.itemtype})</em></li>
               ))}
@@ -88,22 +112,22 @@ function BackofficeTicketDetailPage() {
           {ticket.costs.length === 0 ? (
             <p>Aucun coût enregistré pour ce ticket.</p>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="ticket-detail-page__table">
               <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-                  <th style={{ padding: '0.5rem' }}>Nom</th>
-                  <th style={{ padding: '0.5rem' }}>Temps (s)</th>
-                  <th style={{ padding: '0.5rem' }}>Coût horaire</th>
-                  <th style={{ padding: '0.5rem' }}>Coût fixe</th>
+                <tr>
+                  <th>Nom</th>
+                  <th>Temps (s)</th>
+                  <th>Coût horaire</th>
+                  <th>Coût fixe</th>
                 </tr>
               </thead>
               <tbody>
                 {ticket.costs.map((cost, index) => (
-                  <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '0.5rem' }}>{cost.name}</td>
-                    <td style={{ padding: '0.5rem' }}>{cost.actiontime}</td>
-                    <td style={{ padding: '0.5rem' }}>{cost.cost_time}</td>
-                    <td style={{ padding: '0.5rem' }}>{cost.cost_fixed}</td>
+                  <tr key={index}>
+                    <td>{cost.name}</td>
+                    <td>{cost.actiontime}</td>
+                    <td>{cost.cost_time}</td>
+                    <td>{cost.cost_fixed}</td>
                   </tr>
                 ))}
               </tbody>
@@ -112,6 +136,7 @@ function BackofficeTicketDetailPage() {
         </>
       )}
     </div>
+    </Layout>
   )
 }
 

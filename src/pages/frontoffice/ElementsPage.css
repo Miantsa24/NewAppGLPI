@@ -1,0 +1,126 @@
+.elements-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  font-family: var(--sans);
+  text-align: left;
+}
+
+.elements-page__intro {
+  color: var(--text-muted);
+}
+
+.elements-page__form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.elements-page__type {
+  margin-bottom: 1rem;
+}
+
+.elements-page__type select {
+  padding: 0.4rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-h);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.elements-page__criteria {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.elements-page__criterion {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  gap: 0.35rem;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.elements-page__criterion input {
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-h);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.elements-page__criterion input::placeholder {
+  color: var(--text-muted);
+}
+
+.elements-page__criterion input:focus {
+  border-color: var(--accent);
+}
+
+.elements-page__submit {
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-h);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.elements-page__submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.elements-page__submit:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.elements-page__error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-top: 1rem;
+}
+
+.elements-page__empty {
+  margin-top: 1rem;
+  color: var(--text-muted);
+}
+
+.elements-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.elements-page__table th {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-h);
+}
+
+.elements-page__table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.elements-page__table tbody tr:hover {
+  background: var(--surface);
+}

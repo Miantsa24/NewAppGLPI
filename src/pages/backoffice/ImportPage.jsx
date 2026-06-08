@@ -1,11 +1,24 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import Layout from '../../components/Layout.jsx'
+import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
+import './ImportPage.css'
 
 // Page d'import : un formulaire à 4 champs fichiers (3 CSV + 1 ZIP), envoyés
 // en une seule requête "multipart/form-data" — le même format qu'un <form> HTML
 // classique avec <input type="file">, mais construit ici en JavaScript via
 // l'objet FormData (API native du navigateur).
-function BackofficeImportPage() {
+// onLock : même rôle que dans BackofficeHomePage — prévenir App que l'accès
+// backoffice doit être reverrouillé (le bouton apparaît dans la navbar partagée).
+function BackofficeImportPage({ onLock }) {
+  const navigate = useNavigate()
+
+  function lock() {
+    sessionStorage.removeItem('backoffice_unlocked')
+    onLock()
+    navigate('/backoffice/login')
+  }
+
   // Un état par fichier sélectionné : on affiche le nom du fichier choisi,
   // et ça permet de vérifier que les 4 champs sont bien remplis avant l'envoi.
   const [feuille1, setFeuille1] = useState(null)
@@ -49,9 +62,13 @@ function BackofficeImportPage() {
         body:   formData
       })
       const data = await response.json()
+      // Le détail technique part dans la console — l'affichage à l'écran
+      // (ci-dessous) ne montre qu'un message en texte clair en cas d'échec.
+      if (!data.ok) console.error('Échec de l\'import :', data.error)
       setResult(data)
     } catch (err) {
-      setResult({ ok: false, error: err.message })
+      console.error('Échec de l\'import :', err.message)
+      setResult({ ok: false })
     } finally {
       setLoading(false)
     }
@@ -61,16 +78,21 @@ function BackofficeImportPage() {
   const canSubmit = feuille1 && feuille2 && feuille3 && images && !loading
 
   return (
-    <div style={{ maxWidth: '800px', margin: '2rem auto', fontFamily: 'sans-serif' }}>
-      <p><Link to="/backoffice">← Retour au Backoffice</Link></p>
+    <Layout
+      title="Backoffice NewApp"
+      navLinks={BACKOFFICE_NAV_LINKS}
+      actionLabel="Verrouiller"
+      onAction={lock}
+    >
+    <div className="import-page">
       <h1>Import de données</h1>
-      <p>
+      <p className="import-page__intro">
         Sélectionnez les 3 fichiers CSV (« Import-data-juin-26 ») et le fichier
         ZIP contenant les images, puis lancez l'import. Chaque création dans
         GLPI est journalisée pour permettre une réinitialisation ultérieure.
       </p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <form onSubmit={handleSubmit} className="import-page__form">
         <label>
           Feuille 1 — Éléments (CSV)
           <input type="file" accept=".csv" onChange={e => setFeuille1(e.target.files[0])} />
@@ -91,29 +113,43 @@ function BackofficeImportPage() {
           <input type="file" accept=".zip" onChange={e => setImages(e.target.files[0])} />
         </label>
 
-        <button type="submit" disabled={!canSubmit} style={{ padding: '0.5rem 1rem', cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
+        <button type="submit" disabled={!canSubmit} className="import-page__submit">
           {loading ? 'Import en cours…' : 'Lancer l\'import'}
         </button>
       </form>
 
-      {result && (
-        <div style={{ marginTop: '2rem' }}>
-          <h2>{result.ok ? 'Import terminé' : 'Échec de l\'import'}</h2>
+      {/* Barre de progression indéterminée : le serveur traite tout en une seule
+          requête et ne renvoie le résultat qu'à la toute fin — impossible de
+          connaître une vraie progression en %. La barre s'anime juste en boucle
+          pour montrer que l'import est en cours (pattern courant pour ce cas). */}
+      {loading && (
+        <div className="import-page__progress" role="progressbar" aria-label="Import en cours">
+          <div className="import-page__progress-bar"></div>
+        </div>
+      )}
 
+      {result && (
+        <div className="import-page__result">
           {result.ok ? (
-            // "log" : tableau de messages texte renvoyé par le pipeline,
-            // un par opération effectuée (création, association, ou ignorée).
-            <ul style={{ maxHeight: '400px', overflowY: 'auto', background: '#f5f5f5', padding: '1rem' }}>
-              {result.log.map((line, index) => <li key={index}>{line}</li>)}
-            </ul>
+            <>
+              <p className="import-page__success">
+                Import terminé avec succès — {result.log.length} opération(s) effectuée(s).
+              </p>
+              {/* "log" : tableau de messages texte renvoyé par le pipeline,
+                  un par opération effectuée (création, association, ou ignorée). */}
+              <ul className="import-page__log">
+                {result.log.map((line, index) => <li key={index}>{line}</li>)}
+              </ul>
+            </>
           ) : (
-            <pre style={{ background: '#fee', padding: '1rem', overflowX: 'auto' }}>
-              {JSON.stringify(result.error, null, 2)}
-            </pre>
+            <p className="import-page__error">
+              L'import a échoué. Vérifiez les fichiers sélectionnés et réessayez.
+            </p>
           )}
         </div>
       )}
     </div>
+    </Layout>
   )
 }
 

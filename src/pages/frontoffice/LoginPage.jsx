@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import './LoginPage.css'
 
 // onLogin : fonction fournie par App (= setToken). On l'appelle après un login
 // réussi pour que App connaisse le nouveau token et déclenche un re-rendu —
@@ -51,18 +52,18 @@ function LoginPage({ onLogin }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '6rem' }}>
+    <div className="login-page">
       <h1>NewApp GLPI</h1>
-      <p style={{ color: '#666' }}>Connectez-vous avec vos identifiants GLPI</p>
+      <p className="login-page__subtitle">Connectez-vous avec vos identifiants GLPI</p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '280px' }}>
+      <form onSubmit={handleSubmit} className="login-page__form">
         <input
           type="text"
           placeholder="Nom d'utilisateur GLPI"
           value={username}
           onChange={e => setUsername(e.target.value)}  // e.target.value = ce que l'utilisateur a tapé
           required
-          style={{ padding: '0.5rem', fontSize: '1rem' }}
+          className="login-page__input"
         />
         <input
           type="password"
@@ -70,16 +71,16 @@ function LoginPage({ onLogin }) {
           value={password}
           onChange={e => setPassword(e.target.value)}
           required
-          style={{ padding: '0.5rem', fontSize: '1rem' }}
+          className="login-page__input"
         />
 
         {/* Affichage conditionnel de l'erreur */}
-        {error && <p style={{ color: 'red', margin: 0, fontSize: '0.9rem' }}>{error}</p>}
+        {error && <p className="login-page__error">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          style={{ padding: '0.75rem', fontSize: '1rem', cursor: loading ? 'default' : 'pointer' }}
+          className="login-page__submit"
         >
           {loading ? 'Connexion...' : 'Se connecter'}
         </button>

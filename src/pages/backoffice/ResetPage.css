@@ -1,0 +1,85 @@
+.reset-page {
+  max-width: 800px;
+  margin: 2rem auto;
+  font-family: var(--sans);
+  text-align: left;
+}
+
+.reset-page__intro {
+  color: var(--text-muted);
+}
+
+.reset-page__button {
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: white;
+  background: var(--danger);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.reset-page__button:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+.reset-page__button:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.reset-page__progress {
+  height: 6px;
+  margin-top: 1.5rem;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+/* Barre indéterminée : un segment plus court que le conteneur glisse de
+   gauche à droite en boucle — il n'y a pas de pourcentage réel à afficher. */
+.reset-page__progress-bar {
+  height: 100%;
+  width: 35%;
+  background: var(--danger);
+  border-radius: 3px;
+  animation: reset-progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes reset-progress-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(385%); }
+}
+
+.reset-page__result {
+  margin-top: 1rem;
+}
+
+.reset-page__success {
+  color: var(--success);
+  background: var(--success-bg);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.reset-page__log {
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 1rem;
+  border-radius: 6px;
+}
+
+.reset-page__error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}

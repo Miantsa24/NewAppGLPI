@@ -1,0 +1,8 @@
+.backoffice-home-page {
+  max-width: 800px;
+  font-family: var(--sans);
+}
+
+.backoffice-home-page__intro {
+  color: var(--text-muted);
+}

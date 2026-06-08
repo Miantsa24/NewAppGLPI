@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import './LoginPage.css'
 
 // onUnlock : fonction fournie par App pour le prévenir que le code est validé
 // (même principe que onLogin dans LoginPage — voir App.jsx pour l'explication
@@ -45,26 +46,26 @@ function BackofficeLoginPage({ onUnlock }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '6rem' }}>
+    <div className="backoffice-login-page">
       <h1>Backoffice NewApp</h1>
-      <p style={{ color: '#666' }}>Entrez le code d'accès pour continuer</p>
+      <p className="backoffice-login-page__subtitle">Entrez le code d'accès pour continuer</p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '280px' }}>
+      <form onSubmit={handleSubmit} className="backoffice-login-page__form">
         <input
           type="text"
           placeholder="Code d'accès"
           value={code}
           onChange={e => setCode(e.target.value)}
           required
-          style={{ padding: '0.5rem', fontSize: '1rem', textAlign: 'center', letterSpacing: '0.1em' }}
+          className="backoffice-login-page__input"
         />
 
-        {error && <p style={{ color: 'red', margin: 0, fontSize: '0.9rem' }}>{error}</p>}
+        {error && <p className="backoffice-login-page__error">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          style={{ padding: '0.75rem', fontSize: '1rem', cursor: loading ? 'default' : 'pointer' }}
+          className="backoffice-login-page__submit"
         >
           {loading ? 'Vérification...' : 'Accéder au backoffice'}
         </button>

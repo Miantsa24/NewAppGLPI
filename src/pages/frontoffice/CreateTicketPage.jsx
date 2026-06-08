@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import Layout from '../../components/Layout.jsx'
+import { FRONTOFFICE_NAV_LINKS } from './navLinks.js'
+import './CreateTicketPage.css'
 
 // Mêmes types d'éléments que la page de recherche (ElementsPage) — ce sont les
 // seuls types d'"assets" gérés par ce projet, et donc les seuls associables.
@@ -33,9 +36,17 @@ function itemKey(item) {
   return `${item.itemtype}#${item.items_id}`
 }
 
-function CreateTicketPage() {
+// onLogout : même rôle que dans DashboardPage — prévenir App que le token doit
+// repasser à null, pour que la garde de route redirige bien vers /login.
+function CreateTicketPage({ onLogout }) {
   const token    = localStorage.getItem('access_token')
   const navigate = useNavigate()
+
+  function logout() {
+    localStorage.removeItem('access_token')
+    onLogout()
+    navigate('/login')
+  }
 
   // ── Champs du formulaire de ticket ──────────────────────────────────────────
   const [name,    setName]    = useState('')
@@ -117,7 +128,12 @@ function CreateTicketPage() {
         })
       })
       const data = await response.json()
-      if (!data.ok) throw new Error(JSON.stringify(data.error))
+      if (!data.ok) {
+        // Le détail technique part dans la console — l'utilisateur ne voit
+        // qu'un message en texte clair (pas de JSON brut à l'écran).
+        console.error('Échec de la création du ticket :', data.error)
+        throw new Error('La création du ticket a échoué. Vérifiez les champs et réessayez.')
+      }
 
       // Ticket créé : direction la fiche détail pour voir le résultat (la même
       // page que celle du Backoffice fonctionnerait aussi, mais on reste dans
@@ -131,26 +147,31 @@ function CreateTicketPage() {
   }
 
   return (
-    <div style={{ maxWidth: '900px', margin: '2rem auto', fontFamily: 'sans-serif' }}>
-      <p><Link to="/">← Retour au tableau de bord</Link></p>
+    <Layout
+      title="NewApp GLPI"
+      navLinks={FRONTOFFICE_NAV_LINKS}
+      actionLabel="Déconnexion"
+      onAction={logout}
+    >
+    <div className="create-ticket-page">
       <h1>Créer un ticket</h1>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="create-ticket-page__field">
+          <label>
             Titre
             <input type="text" value={name} onChange={e => setName(e.target.value)} required />
           </label>
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="create-ticket-page__field">
+          <label>
             Description
             <textarea value={content} onChange={e => setContent(e.target.value)} rows={4} required />
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="create-ticket-page__row">
           <label>
             Type {' '}
             <select value={type} onChange={e => setType(Number(e.target.value))}>
@@ -166,22 +187,22 @@ function CreateTicketPage() {
         </div>
 
         {/* ── Association d'éléments ──────────────────────────────────────────── */}
-        <section style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
-          <h2 style={{ marginTop: 0 }}>Éléments concernés</h2>
-          <p>Recherchez et ajoutez un ou plusieurs éléments concernés par ce ticket.</p>
+        <section className="create-ticket-page__items">
+          <h2>Éléments concernés</h2>
+          <p className="create-ticket-page__items-intro">Recherchez et ajoutez un ou plusieurs éléments concernés par ce ticket.</p>
 
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="create-ticket-page__search-row">
+            <label>
               Type d'élément
               <select value={searchType} onChange={e => setSearchType(e.target.value)}>
                 {ELEMENT_TYPES.map(({ itemtype, label }) => <option key={itemtype} value={itemtype}>{label}</option>)}
               </select>
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column' }}>
+            <label>
               Nom
               <input type="text" value={searchName} onChange={e => setSearchName(e.target.value)} placeholder="Rechercher par nom…" />
             </label>
-            <button type="button" onClick={handleSearch} disabled={searching} style={{ padding: '0.5rem 1rem', cursor: searching ? 'not-allowed' : 'pointer' }}>
+            <button type="button" onClick={handleSearch} disabled={searching} className="create-ticket-page__btn">
               {searching ? 'Recherche…' : 'Rechercher'}
             </button>
           </div>
@@ -189,13 +210,13 @@ function CreateTicketPage() {
           {searchResults && searchResults.length === 0 && <p>Aucun résultat.</p>}
 
           {searchResults && searchResults.length > 0 && (
-            <ul style={{ listStyle: 'none', padding: 0, marginTop: '1rem' }}>
+            <ul className="create-ticket-page__list">
               {searchResults.map(element => {
                 const already = selectedItems.some(i => itemKey(i) === itemKey({ itemtype: searchType, items_id: element.id }))
                 return (
-                  <li key={element.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid #ddd' }}>
+                  <li key={element.id} className="create-ticket-page__list-item">
                     <span>{element.name}</span>
-                    <button type="button" onClick={() => addItem(element)} disabled={already} style={{ cursor: already ? 'not-allowed' : 'pointer' }}>
+                    <button type="button" onClick={() => addItem(element)} disabled={already} className="create-ticket-page__add-btn">
                       {already ? 'Déjà ajouté' : 'Ajouter'}
                     </button>
                   </li>
@@ -208,11 +229,11 @@ function CreateTicketPage() {
           {selectedItems.length === 0 ? (
             <p>Aucun élément sélectionné pour l'instant.</p>
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
+            <ul className="create-ticket-page__list">
               {selectedItems.map(item => (
-                <li key={itemKey(item)} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid #ddd' }}>
+                <li key={itemKey(item)} className="create-ticket-page__list-item">
                   <span>{item.name} <em>({item.itemtype})</em></span>
-                  <button type="button" onClick={() => removeItem(item)} style={{ cursor: 'pointer', color: '#c0392b' }}>
+                  <button type="button" onClick={() => removeItem(item)} className="create-ticket-page__remove-btn">
                     Retirer
                   </button>
                 </li>
@@ -222,14 +243,15 @@ function CreateTicketPage() {
         </section>
 
         {submitError && (
-          <pre style={{ background: '#fee', padding: '1rem', overflowX: 'auto' }}>{submitError}</pre>
+          <p className="create-ticket-page__error">{submitError}</p>
         )}
 
-        <button type="submit" disabled={submitting} style={{ padding: '0.5rem 1.5rem', cursor: submitting ? 'not-allowed' : 'pointer' }}>
+        <button type="submit" disabled={submitting} className="create-ticket-page__submit">
           {submitting ? 'Création…' : 'Créer le ticket'}
         </button>
       </form>
     </div>
+    </Layout>
   )
 }
 

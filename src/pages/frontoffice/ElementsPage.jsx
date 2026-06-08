@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import Layout from '../../components/Layout.jsx'
+import { FRONTOFFICE_NAV_LINKS } from './navLinks.js'
+import './ElementsPage.css'
 
 // Mêmes types et libellés que le Dashboard Backoffice (server/dashboardData.js)
 // — ce sont les seuls types d'éléments ("assets") gérés par ce projet.
@@ -52,8 +55,17 @@ function cellValue(nestedObject) {
   return nestedObject?.name ?? '—'
 }
 
-function ElementsPage() {
-  const token = localStorage.getItem('access_token')
+// onLogout : même rôle que dans DashboardPage — prévenir App que le token doit
+// repasser à null, pour que la garde de route redirige bien vers /login.
+function ElementsPage({ onLogout }) {
+  const token    = localStorage.getItem('access_token')
+  const navigate = useNavigate()
+
+  function logout() {
+    localStorage.removeItem('access_token')
+    onLogout()
+    navigate('/login')
+  }
 
   const [itemtype, setItemtype] = useState('Computer')
 
@@ -90,20 +102,28 @@ function ElementsPage() {
       if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { glpi: body })
       setResults(body)
     } catch (err) {
-      setError({ message: err.message, detail: err.glpi ?? null })
+      // Le détail technique part dans la console — l'utilisateur ne voit
+      // qu'un message en texte clair (pas de JSON brut à l'écran).
+      console.error('Échec de la recherche d\'éléments :', err.message, err.glpi)
+      setError(true)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{ maxWidth: '900px', margin: '2rem auto', fontFamily: 'sans-serif' }}>
-      <p><Link to="/">← Retour au tableau de bord</Link></p>
+    <Layout
+      title="NewApp GLPI"
+      navLinks={FRONTOFFICE_NAV_LINKS}
+      actionLabel="Déconnexion"
+      onAction={logout}
+    >
+    <div className="elements-page">
       <h1>Éléments</h1>
-      <p>Recherche en direct dans GLPI — combinez plusieurs critères pour affiner les résultats.</p>
+      <p className="elements-page__intro">Recherche en direct dans GLPI — combinez plusieurs critères pour affiner les résultats.</p>
 
-      <form onSubmit={handleSearch} style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '8px' }}>
-        <div style={{ marginBottom: '1rem' }}>
+      <form onSubmit={handleSearch} className="elements-page__form">
+        <div className="elements-page__type">
           <label>
             Type d'élément {' '}
             <select value={itemtype} onChange={e => setItemtype(e.target.value)}>
@@ -114,9 +134,9 @@ function ElementsPage() {
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div className="elements-page__criteria">
           {SEARCH_FIELDS.map(({ field, label }) => (
-            <label key={field} style={{ display: 'flex', flexDirection: 'column', minWidth: '180px' }}>
+            <label key={field} className="elements-page__criterion">
               {label}
               <input
                 type="text"
@@ -128,44 +148,45 @@ function ElementsPage() {
           ))}
         </div>
 
-        <button type="submit" disabled={loading} style={{ padding: '0.5rem 1rem', cursor: loading ? 'not-allowed' : 'pointer' }}>
+        <button type="submit" disabled={loading} className="elements-page__submit">
           {loading ? 'Recherche…' : 'Rechercher'}
         </button>
       </form>
 
       {error && (
-        <pre style={{ background: '#fee', padding: '1rem', overflowX: 'auto', marginTop: '1rem' }}>
-          {JSON.stringify(error.detail ?? error.message, null, 2)}
-        </pre>
+        <p className="elements-page__error">
+          La recherche a échoué. Vérifiez vos critères et réessayez.
+        </p>
       )}
 
-      {results && results.length === 0 && <p style={{ marginTop: '1rem' }}>Aucun élément ne correspond à ces critères.</p>}
+      {results && results.length === 0 && <p className="elements-page__empty">Aucun élément ne correspond à ces critères.</p>}
 
       {results && results.length > 0 && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
+        <table className="elements-page__table">
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-              <th style={{ padding: '0.5rem' }}>Nom</th>
-              <th style={{ padding: '0.5rem' }}>Statut</th>
-              <th style={{ padding: '0.5rem' }}>Emplacement</th>
-              <th style={{ padding: '0.5rem' }}>Fabricant</th>
-              <th style={{ padding: '0.5rem' }}>N° de série</th>
+            <tr>
+              <th>Nom</th>
+              <th>Statut</th>
+              <th>Emplacement</th>
+              <th>Fabricant</th>
+              <th>N° de série</th>
             </tr>
           </thead>
           <tbody>
             {results.map(element => (
-              <tr key={element.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '0.5rem' }}>{element.name}</td>
-                <td style={{ padding: '0.5rem' }}>{cellValue(element.status)}</td>
-                <td style={{ padding: '0.5rem' }}>{cellValue(element.location)}</td>
-                <td style={{ padding: '0.5rem' }}>{cellValue(element.manufacturer)}</td>
-                <td style={{ padding: '0.5rem' }}>{element.serial ?? '—'}</td>
+              <tr key={element.id}>
+                <td>{element.name}</td>
+                <td>{cellValue(element.status)}</td>
+                <td>{cellValue(element.location)}</td>
+                <td>{cellValue(element.manufacturer)}</td>
+                <td>{element.serial ?? '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
     </div>
+    </Layout>
   )
 }
 

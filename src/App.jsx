@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import LoginPage           from './pages/LoginPage.jsx'
-import DashboardPage       from './pages/DashboardPage.jsx'
-import ElementsPage        from './pages/ElementsPage.jsx'
-import CreateTicketPage    from './pages/CreateTicketPage.jsx'
-import BackofficeLoginPage  from './pages/BackofficeLoginPage.jsx'
-import BackofficeHomePage   from './pages/BackofficeHomePage.jsx'
-import BackofficeImportPage   from './pages/BackofficeImportPage.jsx'
-import BackofficeDashboardPage from './pages/BackofficeDashboardPage.jsx'
-import BackofficeTicketsPage   from './pages/BackofficeTicketsPage.jsx'
-import BackofficeTicketDetailPage from './pages/BackofficeTicketDetailPage.jsx'
+// FrontOffice : pages accessibles aux utilisateurs GLPI authentifiés (token OAuth2)
+import LoginPage           from './pages/frontoffice/LoginPage.jsx'
+import DashboardPage       from './pages/frontoffice/DashboardPage.jsx'
+import ElementsPage        from './pages/frontoffice/ElementsPage.jsx'
+import CreateTicketPage    from './pages/frontoffice/CreateTicketPage.jsx'
+
+// Backoffice : pages réservées à l'administration, protégées par le code unique
+import BackofficeLoginPage        from './pages/backoffice/LoginPage.jsx'
+import BackofficeHomePage         from './pages/backoffice/HomePage.jsx'
+import BackofficeImportPage       from './pages/backoffice/ImportPage.jsx'
+import BackofficeDashboardPage    from './pages/backoffice/DashboardPage.jsx'
+import BackofficeTicketsPage      from './pages/backoffice/TicketsPage.jsx'
+import BackofficeTicketDetailPage from './pages/backoffice/TicketDetailPage.jsx'
+import BackofficeResetPage        from './pages/backoffice/ResetPage.jsx'
 
 function App() {
   // useState avec fonction d'initialisation : localStorage n'est lu qu'UNE fois,
@@ -44,14 +48,14 @@ function App() {
           par le token GLPI comme la page d'accueil ("/"), même garde, même schéma. */}
       <Route
         path="/elements"
-        element={token ? <ElementsPage /> : <Navigate to="/login" replace />}
+        element={token ? <ElementsPage onLogout={() => setToken(null)} /> : <Navigate to="/login" replace />}
       />
 
       {/* FrontOffice : création de ticket avec association de plusieurs éléments
           (Phase 7) — même garde que les autres pages protégées par le token. */}
       <Route
         path="/tickets/new"
-        element={token ? <CreateTicketPage /> : <Navigate to="/login" replace />}
+        element={token ? <CreateTicketPage onLogout={() => setToken(null)} /> : <Navigate to="/login" replace />}
       />
 
       {/* Saisie du code d'accès backoffice — onUnlock = setBackofficeUnlocked(true) */}
@@ -77,7 +81,7 @@ function App() {
         path="/backoffice/import"
         element={
           backofficeUnlocked
-            ? <BackofficeImportPage />
+            ? <BackofficeImportPage onLock={() => setBackofficeUnlocked(false)} />
             : <Navigate to="/backoffice/login" replace />
         }
       />
@@ -87,7 +91,7 @@ function App() {
         path="/backoffice/dashboard"
         element={
           backofficeUnlocked
-            ? <BackofficeDashboardPage />
+            ? <BackofficeDashboardPage onLock={() => setBackofficeUnlocked(false)} />
             : <Navigate to="/backoffice/login" replace />
         }
       />
@@ -98,7 +102,7 @@ function App() {
         path="/backoffice/tickets"
         element={
           backofficeUnlocked
-            ? <BackofficeTicketsPage />
+            ? <BackofficeTicketsPage onLock={() => setBackofficeUnlocked(false)} />
             : <Navigate to="/backoffice/login" replace />
         }
       />
@@ -106,7 +110,18 @@ function App() {
         path="/backoffice/tickets/:id"
         element={
           backofficeUnlocked
-            ? <BackofficeTicketDetailPage />
+            ? <BackofficeTicketDetailPage onLock={() => setBackofficeUnlocked(false)} />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+
+      {/* Réinitialisation des données : sortie de la page d'accueil pour avoir
+          son propre espace (action destructrice) — même garde que le reste. */}
+      <Route
+        path="/backoffice/reset"
+        element={
+          backofficeUnlocked
+            ? <BackofficeResetPage onLock={() => setBackofficeUnlocked(false)} />
             : <Navigate to="/backoffice/login" replace />
         }
       />

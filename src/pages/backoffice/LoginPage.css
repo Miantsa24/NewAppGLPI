@@ -1,0 +1,72 @@
+.backoffice-login-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 6rem;
+}
+
+.backoffice-login-page__subtitle {
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+
+.backoffice-login-page__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 280px;
+  margin-top: 2rem;
+}
+
+.backoffice-login-page__input {
+  padding: 0.6rem 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  text-align: center;
+  letter-spacing: 0.1em;
+  color: var(--text-h);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.backoffice-login-page__input::placeholder {
+  color: var(--text-muted);
+  letter-spacing: normal;
+}
+
+.backoffice-login-page__input:focus {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.backoffice-login-page__error {
+  color: var(--danger);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.backoffice-login-page__submit {
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-h);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.backoffice-login-page__submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.backoffice-login-page__submit:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: default;
+}

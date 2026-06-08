@@ -1,0 +1,51 @@
+.backoffice-dashboard-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  font-family: var(--sans);
+  text-align: left;
+}
+
+.backoffice-dashboard-page__intro {
+  color: var(--text-muted);
+}
+
+.backoffice-dashboard-page__error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}
+
+.backoffice-dashboard-page__section-title {
+  margin-top: 2rem;
+}
+
+.backoffice-dashboard-page__cards {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  min-width: 160px;
+  text-align: center;
+  transition: border-color 0.15s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--accent-border);
+}
+
+.stat-card__count {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.stat-card__label {
+  color: var(--text);
+}
