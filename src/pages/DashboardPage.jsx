@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 // Variable de module : partagée entre TOUTES les instances du composant.
 // Contrairement à useRef qui crée un objet par instance, une variable de module
@@ -53,6 +53,11 @@ function DashboardPage({ onLogout }) {
           Déconnexion
         </button>
       </div>
+
+      <nav style={{ margin: '1rem 0', display: 'flex', gap: '1rem' }}>
+        <Link to="/elements">Rechercher des éléments</Link>
+        <Link to="/tickets/new">Créer un ticket</Link>
+      </nav>
 
       <h2>Utilisateurs GLPI</h2>
 

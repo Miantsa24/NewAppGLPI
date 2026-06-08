@@ -1,0 +1,11 @@
+Name,Status,Location,Manufacturer,Item_Type,Model,Inventory_Number,User
+PC-ADM-001,En production,Administration,Dell,Computer,OptiPlex 7010,ITU-2026-0001,Rakoto Jean
+PC-ADM-002,En production,Administration,HP,Computer,ProDesk 400 G9,ITU-2026-0002,Rasoanaivo Marie
+PC-COMPTA-001,En production,Comptabilité,Lenovo,Computer,ThinkCentre M70,ITU-2026-0003,Rakotondranaivo Paul
+PC-COMPTA-002,Maintenance,Comptabilité,Dell,Computer,OptiPlex 7020,ITU-2026-0004,Rabe Hanitra
+PC-LAB-001,En production,Laboratoire IA,HP,Computer,EliteDesk 800 G8,ITU-2026-0005,ITU Labs
+PC-LAB-002,En production,Laboratoire IA,Lenovo,Computer,ThinkCentre M75,ITU-2026-0006,ITU Labs
+PC-LAB-003,En production,Laboratoire IA,Dell,Computer,OptiPlex 7090,ITU-2026-0007,ITU Labs
+PC-BIB-001,En production,Bibliothèque,HP,Computer,ProDesk 600 G6,ITU-2026-0008,Bibliothèque
+PC-FORM-001,En stock,Magasin Informatique,Lenovo,Computer,ThinkCentre Neo 50,ITU-2026-0009,
+MN-FORM-002,En panne,Salle 301,Dell,Monitor,AC1000,ITU-2026-0010,Rakoto Michel

@@ -8,3 +8,6 @@ client ID: 24e3784d34e66090d11e5f6cdf92099f57b0d0c4bb426a4e9655a4d5b8483ff2
 client secret: 08616e257b1b7160bf96bd1461cabccae77a95e15a883c53af3d10c992ee5606
 scopes: user, email, api
 grant: Code d'autorisation
+
+app-token: WdjUyaxwURbqDnI5P33iQZKLNzMGFZOHrrD4oiek
+jeton d'API: XRbNgXWjA2UEip7t3t07eWsGdXHvxBHJBdod46dB

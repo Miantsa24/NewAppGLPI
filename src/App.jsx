@@ -2,8 +2,14 @@ import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage           from './pages/LoginPage.jsx'
 import DashboardPage       from './pages/DashboardPage.jsx'
-import BackofficeLoginPage from './pages/BackofficeLoginPage.jsx'
-import BackofficeHomePage  from './pages/BackofficeHomePage.jsx'
+import ElementsPage        from './pages/ElementsPage.jsx'
+import CreateTicketPage    from './pages/CreateTicketPage.jsx'
+import BackofficeLoginPage  from './pages/BackofficeLoginPage.jsx'
+import BackofficeHomePage   from './pages/BackofficeHomePage.jsx'
+import BackofficeImportPage   from './pages/BackofficeImportPage.jsx'
+import BackofficeDashboardPage from './pages/BackofficeDashboardPage.jsx'
+import BackofficeTicketsPage   from './pages/BackofficeTicketsPage.jsx'
+import BackofficeTicketDetailPage from './pages/BackofficeTicketDetailPage.jsx'
 
 function App() {
   // useState avec fonction d'initialisation : localStorage n'est lu qu'UNE fois,
@@ -34,6 +40,20 @@ function App() {
         element={token ? <DashboardPage onLogout={() => setToken(null)} /> : <Navigate to="/login" replace />}
       />
 
+      {/* FrontOffice : recherche multicritère des éléments (Phase 6) — protégée
+          par le token GLPI comme la page d'accueil ("/"), même garde, même schéma. */}
+      <Route
+        path="/elements"
+        element={token ? <ElementsPage /> : <Navigate to="/login" replace />}
+      />
+
+      {/* FrontOffice : création de ticket avec association de plusieurs éléments
+          (Phase 7) — même garde que les autres pages protégées par le token. */}
+      <Route
+        path="/tickets/new"
+        element={token ? <CreateTicketPage /> : <Navigate to="/login" replace />}
+      />
+
       {/* Saisie du code d'accès backoffice — onUnlock = setBackofficeUnlocked(true) */}
       <Route
         path="/backoffice/login"
@@ -47,6 +67,46 @@ function App() {
         element={
           backofficeUnlocked
             ? <BackofficeHomePage onLock={() => setBackofficeUnlocked(false)} />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+
+      {/* Page d'import : protégée par le même garde que "/backoffice" — on ne
+          duplique pas le composant BackofficeHomePage, juste la condition. */}
+      <Route
+        path="/backoffice/import"
+        element={
+          backofficeUnlocked
+            ? <BackofficeImportPage />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+
+      {/* Dashboard : même garde, même principe. */}
+      <Route
+        path="/backoffice/dashboard"
+        element={
+          backofficeUnlocked
+            ? <BackofficeDashboardPage />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+
+      {/* Tickets : liste et fiche détail (Phase 5) — même garde. La fiche détail
+          utilise un segment dynamique ":id", lu côté composant via useParams(). */}
+      <Route
+        path="/backoffice/tickets"
+        element={
+          backofficeUnlocked
+            ? <BackofficeTicketsPage />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+      <Route
+        path="/backoffice/tickets/:id"
+        element={
+          backofficeUnlocked
+            ? <BackofficeTicketDetailPage />
             : <Navigate to="/backoffice/login" replace />
         }
       />
