@@ -1,0 +1,63 @@
+.backoffice-elements-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  font-family: var(--sans);
+  text-align: left;
+}
+
+.backoffice-elements-page__intro {
+  color: var(--text-muted);
+}
+
+.backoffice-elements-page__type {
+  margin-bottom: 1rem;
+}
+
+.backoffice-elements-page__type select {
+  padding: 0.4rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-h);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.backoffice-elements-page__error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}
+
+.backoffice-elements-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.backoffice-elements-page__table th {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-h);
+}
+
+.backoffice-elements-page__table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.backoffice-elements-page__table tbody tr:hover {
+  background: var(--surface);
+}
+
+.backoffice-elements-page__table a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.backoffice-elements-page__table a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}

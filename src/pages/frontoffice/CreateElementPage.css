@@ -1,0 +1,92 @@
+.create-element-page {
+  max-width: 700px;
+  margin: 2rem auto;
+  font-family: var(--sans);
+  text-align: left;
+}
+
+.create-element-page__field {
+  margin-bottom: 1rem;
+}
+
+.create-element-page__field label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.create-element-page input[type="text"],
+.create-element-page textarea,
+.create-element-page select {
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-h);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.create-element-page input[type="text"]:focus,
+.create-element-page textarea:focus,
+.create-element-page select:focus {
+  border-color: var(--accent);
+}
+
+.create-element-page__row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.create-element-page__row label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.create-element-page__error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.create-element-page__success {
+  background: var(--success-bg);
+  color: var(--success);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.create-element-page__submit {
+  padding: 0.6rem 1.5rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-h);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.create-element-page__submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.create-element-page__submit:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}

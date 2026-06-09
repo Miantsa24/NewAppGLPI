@@ -4,9 +4,12 @@
 // (sans ça, NavLink considère que "/backoffice/tickets" commence par
 // "/backoffice" et active aussi ce lien).
 export const BACKOFFICE_NAV_LINKS = [
-  { to: '/backoffice',          label: 'Accueil',                  end: true },
-  { to: '/backoffice/dashboard', label: 'Dashboard' },
-  { to: '/backoffice/tickets',   label: 'Tickets' },
-  { to: '/backoffice/import',    label: 'Importer des données' },
-  { to: '/backoffice/reset',     label: 'Réinitialiser les données' }
+  { to: '/backoffice',                 label: 'Accueil',                   end: true },
+  { to: '/backoffice/dashboard',       label: 'Dashboard' },
+  { to: '/backoffice/tickets',         label: 'Tickets' },
+  { to: '/backoffice/elements/computers', label: 'Ordinateurs' },
+  { to: '/backoffice/elements/monitors',  label: 'Écrans' },
+  { to: '/backoffice/elements/others',    label: 'Autres éléments' },
+  { to: '/backoffice/import',          label: 'Importer des données' },
+  { to: '/backoffice/reset',           label: 'Réinitialiser les données' }
 ]

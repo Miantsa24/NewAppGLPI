@@ -8,6 +8,7 @@ import db      from './db.js'
 import { runImport, resetImportedData } from './importPipeline.js'
 import { getDashboardStats } from './dashboardData.js'
 import { listTickets, getTicketDetail } from './ticketsData.js'
+import { listElements, getElementDetail } from './elementsData.js'
 import { createTicketWithItems } from './ticketCreation.js'
 
 const app  = express()
@@ -144,6 +145,33 @@ app.get('/api/backoffice/tickets/:id', async (req, res) => {
   } catch (err) {
     const glpiError = err.response?.data ?? err.message
     console.error('[tickets/:id] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  }
+})
+
+// ── Pages Éléments (Backoffice) : liste + fiche détail ─────────────────────────
+// ":itemtype" couvre les 6 types d'"assets" gérés par ce projet (Computer,
+// Monitor, NetworkEquipment, Peripheral, Phone, Printer) — un seul couple de
+// routes générique, comme la recherche FrontOffice (ElementsPage) qui traite
+// déjà ces 6 types de façon uniforme (voir elementsData.js pour le détail).
+app.get('/api/backoffice/elements/:itemtype', async (req, res) => {
+  try {
+    const elements = await listElements(req.params.itemtype)
+    res.json({ ok: true, elements })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[elements] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  }
+})
+
+app.get('/api/backoffice/elements/:itemtype/:id', async (req, res) => {
+  try {
+    const element = await getElementDetail(req.params.itemtype, req.params.id)
+    res.json({ ok: true, element })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[elements/:id] Erreur :', JSON.stringify(glpiError, null, 2))
     res.status(500).json({ ok: false, error: glpiError })
   }
 })

@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage           from './pages/frontoffice/LoginPage.jsx'
 import DashboardPage       from './pages/frontoffice/DashboardPage.jsx'
 import ElementsPage        from './pages/frontoffice/ElementsPage.jsx'
+import CreateElementPage   from './pages/frontoffice/CreateElementPage.jsx'
 import CreateTicketPage    from './pages/frontoffice/CreateTicketPage.jsx'
 
 // Backoffice : pages réservées à l'administration, protégées par le code unique
@@ -13,6 +14,8 @@ import BackofficeImportPage       from './pages/backoffice/ImportPage.jsx'
 import BackofficeDashboardPage    from './pages/backoffice/DashboardPage.jsx'
 import BackofficeTicketsPage      from './pages/backoffice/TicketsPage.jsx'
 import BackofficeTicketDetailPage from './pages/backoffice/TicketDetailPage.jsx'
+import BackofficeElementsPage      from './pages/backoffice/ElementsPage.jsx'
+import BackofficeElementDetailPage from './pages/backoffice/ElementDetailPage.jsx'
 import BackofficeResetPage        from './pages/backoffice/ResetPage.jsx'
 
 function App() {
@@ -49,6 +52,22 @@ function App() {
       <Route
         path="/elements"
         element={token ? <ElementsPage onLogout={() => setToken(null)} /> : <Navigate to="/login" replace />}
+      />
+
+      {/* FrontOffice : création d'éléments (Computer/Monitor/"autres") — un seul
+          composant générique (CreateElementPage), trois entrées de menu distinctes
+          ("Une page par catégorie"), même garde par token que les autres pages. */}
+      <Route
+        path="/elements/computers/new"
+        element={token ? <CreateElementPage onLogout={() => setToken(null)} pageTitle="Créer un ordinateur" itemtype="Computer" /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/elements/monitors/new"
+        element={token ? <CreateElementPage onLogout={() => setToken(null)} pageTitle="Créer un écran" itemtype="Monitor" /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/elements/others/new"
+        element={token ? <CreateElementPage onLogout={() => setToken(null)} pageTitle="Créer un autre élément" itemtype="others" /> : <Navigate to="/login" replace />}
       />
 
       {/* FrontOffice : création de ticket avec association de plusieurs éléments
@@ -111,6 +130,43 @@ function App() {
         element={
           backofficeUnlocked
             ? <BackofficeTicketDetailPage onLock={() => setBackofficeUnlocked(false)} />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+
+      {/* Éléments : liste en direct depuis GLPI + fiche détaillée — un seul couple
+          de composants génériques (BackofficeElementsPage / BackofficeElementDetailPage),
+          trois entrées de menu distinctes (Ordinateurs/Écrans/Autres éléments),
+          même garde que le reste. La fiche détail couvre les 6 types via ":itemtype". */}
+      <Route
+        path="/backoffice/elements/computers"
+        element={
+          backofficeUnlocked
+            ? <BackofficeElementsPage onLock={() => setBackofficeUnlocked(false)} pageTitle="Ordinateurs" itemtype="Computer" intro="Liste en direct depuis GLPI — cliquez sur un élément pour voir sa fiche détaillée." />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+      <Route
+        path="/backoffice/elements/monitors"
+        element={
+          backofficeUnlocked
+            ? <BackofficeElementsPage onLock={() => setBackofficeUnlocked(false)} pageTitle="Écrans" itemtype="Monitor" intro="Liste en direct depuis GLPI — cliquez sur un élément pour voir sa fiche détaillée." />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+      <Route
+        path="/backoffice/elements/others"
+        element={
+          backofficeUnlocked
+            ? <BackofficeElementsPage onLock={() => setBackofficeUnlocked(false)} pageTitle="Autres éléments" itemtype="others" intro="Liste en direct depuis GLPI — choisissez un type, puis cliquez sur un élément pour voir sa fiche détaillée." />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+      <Route
+        path="/backoffice/elements/:itemtype/:id"
+        element={
+          backofficeUnlocked
+            ? <BackofficeElementDetailPage onLock={() => setBackofficeUnlocked(false)} />
             : <Navigate to="/backoffice/login" replace />
         }
       />
