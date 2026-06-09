@@ -7,9 +7,11 @@ import multer  from 'multer'
 import db      from './db.js'
 import { runImport, resetImportedData } from './importPipeline.js'
 import { getDashboardStats } from './dashboardData.js'
-import { listTickets, getTicketDetail } from './ticketsData.js'
+import { listTickets, getTicketDetail, listTicketsForKanban } from './ticketsData.js'
 import { listElements, getElementDetail } from './elementsData.js'
+import { getKanbanSettings, updateKanbanSettings } from './kanbanSettings.js'
 import { createTicketWithItems } from './ticketCreation.js'
+import * as glpiV1 from './glpiV1Client.js'
 
 const app  = express()
 const PORT = process.env.PORT || 3001
@@ -176,6 +178,32 @@ app.get('/api/backoffice/elements/:itemtype/:id', async (req, res) => {
   }
 })
 
+// ── Paramètres Kanban ─────────────────────────────────────────────────────────
+// GET : accessible par le FrontOffice ET le Backoffice (pas de garde) — les
+// paramètres (couleurs, labels) ne sont pas sensibles, tout le monde peut les lire.
+// PUT : réservé au Backoffice dans la pratique (le formulaire n'existe que là),
+// mais on n'ajoute pas de garde technique ici pour rester cohérent avec le reste
+// des routes backoffice (la protection est assurée par le frontend ProtectedRoute).
+app.get('/api/kanban/settings', (req, res) => {
+  try {
+    const settings = getKanbanSettings()
+    res.json({ ok: true, settings })
+  } catch (err) {
+    console.error('[kanban/settings GET] Erreur :', err.message)
+    res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
+app.put('/api/backoffice/kanban/settings', (req, res) => {
+  try {
+    const settings = updateKanbanSettings(req.body)
+    res.json({ ok: true, settings })
+  } catch (err) {
+    console.error('[kanban/settings PUT] Erreur :', err.message)
+    res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
 // ── Authentification : Password Grant ─────────────────────────────────────────
 // L'utilisateur entre ses credentials GLPI dans le formulaire NewApp.
 // Express les transmet à GLPI via OAuth2 "password grant" (grant_type=password).
@@ -244,6 +272,60 @@ app.use('/api/glpi', async (req, res) => {
     // Log formaté pour voir le corps COMPLET de l'erreur GLPI (utile pour diagnostiquer)
     console.error(`[proxy] Erreur ${status} sur ${targetUrl}:`, JSON.stringify(body, null, 2))
     res.status(status).json(body)
+  }
+})
+
+// ── Kanban FrontOffice : changement de statut d'un ticket (Phase 11) ──────────
+// On passe par v1 (session serveur) plutôt que par le proxy v2 pour deux raisons :
+//   1. Le proxy v2 filtre les tickets selon le token de l'utilisateur connecté —
+//      il peut ne pas avoir le droit de modifier des tickets créés par l'import.
+//   2. Pour "Terminé" (statut 5), GLPI exige une solution ; en v1, createItem
+//      sur ITILSolution résout LE ticket ET enregistre la solution en un seul appel.
+//      L'équivalent via sous-ressource v2 n'est pas disponible sur cette version.
+// Body : { status: 1|2|5, solution?: "..." }  (solution requis quand status === 5)
+app.patch('/api/frontoffice/kanban-tickets/:id/status', async (req, res) => {
+  const ticketId = req.params.id
+  const { status, solution } = req.body
+
+  if (!status) return res.status(400).json({ ok: false, error: 'status requis' })
+
+  const sessionToken = await glpiV1.openSession()
+  try {
+    if (status === 5) {
+      // Créer une ITILSolution en v1 : GLPI résout automatiquement le ticket
+      // et enregistre la solution. Pas besoin de PATCH le statut séparément.
+      await glpiV1.createItem(sessionToken, 'ITILSolution', {
+        itemtype: 'Ticket',
+        items_id: Number(ticketId),
+        content:  solution || '(résolu)'
+      })
+    } else {
+      // Changement simple de statut (ex. Nouveau ↔ In progress)
+      await glpiV1.updateItem(sessionToken, 'Ticket', ticketId, { status })
+    }
+    res.json({ ok: true })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[kanban status] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  } finally {
+    await glpiV1.closeSession(sessionToken)
+  }
+})
+
+// ── Kanban FrontOffice : liste de tous les tickets (Phase 11) ─────────────────
+// Utilise une session v1 (credentials serveur) pour récupérer TOUS les tickets,
+// peu importe qui les a créés — contrairement au proxy v2 qui filtre les tickets
+// selon les droits de l'utilisateur connecté et ne retourne que les siens.
+// Renvoie { id, name, status } avec "status" en entier brut GLPI (pas traduit).
+app.get('/api/frontoffice/kanban-tickets', async (req, res) => {
+  try {
+    const tickets = await listTicketsForKanban()
+    res.json({ ok: true, tickets })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[kanban-tickets] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
   }
 })
 

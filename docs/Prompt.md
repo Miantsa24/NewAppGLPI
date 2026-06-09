@@ -54,3 +54,23 @@ Formulaire de création + sélecteur multi-éléments → POST vers GLPI
 # Phase 8 — Vérifications ExistingApp
 Confirmer que les données importées apparaissent dans GLPI
 Modifier une donnée dans GLPI, vérifier l'impact côté NewApp
+
+# Phase 9 — CRUD Éléments FrontOffice (Ordinateur, Écran, Autres)
+FrontOffice : formulaire de création générique (Nom, N° série, Autre n° série, Commentaire) + 3 entrées de menu (Ordinateur / Écran / Autre élément — sélecteur de type pour les 4 types restants)
+POST vers GLPI via proxy v2 avec le Bearer token de l'utilisateur connecté
+Message de succès/erreur, formulaire réinitialisé après création pour en créer plusieurs à la suite
+# Phase 10 — CRUD Éléments Backoffice (liste + fiche détail)
+Backoffice : liste en direct depuis GLPI (via session v1) pour 3 menus (Ordinateurs / Écrans / Autres éléments)
+Fiche détail : emplacement, fabricant, statut, numéros de série, commentaire — relations résolues via appels parallèles (Promise.all)
+Composant générique unique pour les 6 types, paramétré par itemtype
+# Phase 11 — Kanban FrontOffice (J-2)
+Table SQLite kanban_settings : 3 couleurs de fond + labels FR + labels Malgaches (9 clés)
+FrontOffice : page Kanban avec 3 colonnes (Nouveau / In progress / Terminé), couleurs et labels depuis l'API
+Drag & drop HTML5 natif entre colonnes ; dialogue obligatoire (saisie de la solution) pour passer en Terminé
+Sélecteur de langue FR/MG sur la page ; fallback sur le français si la traduction Malgache n'est pas configurée
+Clic sur un ticket → modale de détail (titre, type, statut, priorité, date, description, éléments associés)
+Bouton « Ajouter 1 ticket » (bas de la colonne Nouveau) → modale de création (Titre + Description)
+# Phase 12 — Paramètres Kanban Backoffice (J-2)
+Page Backoffice dédiée : 3 color pickers (couleurs de fond) + 3 champs texte (noms Malgaches)
+Persistance dans SQLite via PUT /api/backoffice/kanban/settings
+Lecture partagée via GET /api/kanban/settings (accessible aussi par le FrontOffice)

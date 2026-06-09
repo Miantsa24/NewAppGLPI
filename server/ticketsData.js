@@ -42,6 +42,22 @@ function describeTicket(ticket) {
   }
 }
 
+// ── Liste minimale pour le Kanban ─────────────────────────────────────────────
+// Renvoie TOUS les tickets (session v1 serveur, pas de filtre par utilisateur)
+// avec uniquement { id, name, status } — "status" EST un entier brut GLPI (1-6),
+// pas un libellé traduit, car le Kanban a besoin du code numérique pour ranger
+// chaque ticket dans la bonne colonne (columnKeyFor dans KanbanPage.jsx).
+// Différence avec listTickets() : pas de tri, pas de traduction, données minimales.
+export async function listTicketsForKanban() {
+  const sessionToken = await glpi.openSession()
+  try {
+    const tickets = await glpi.listItems(sessionToken, 'Ticket')
+    return tickets.map(t => ({ id: t.id, name: t.name, status: t.status }))
+  } finally {
+    await glpi.closeSession(sessionToken)
+  }
+}
+
 // ── Liste des tickets ──────────────────────────────────────────────────────────
 // Renvoie une version "résumée" de chaque ticket — suffisant pour un tableau
 // récapitulatif (la fiche détail ira chercher le reste à la demande).

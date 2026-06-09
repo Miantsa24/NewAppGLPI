@@ -1,0 +1,356 @@
+/* ── Page ─────────────────────────────────────────────────────────────────── */
+.kanban-page {
+  font-family: var(--sans);
+  text-align: left;
+}
+
+.kanban-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.kanban-page__header h1 {
+  margin: 0;
+}
+
+.kanban-page__error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+/* ── Sélecteur de langue FR / MG ─────────────────────────────────────────── */
+.kanban-page__lang {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.kanban-lang-btn {
+  padding: 0.35rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: none;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.kanban-lang-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.kanban-lang-btn--active {
+  background: var(--accent);
+  color: var(--text-h);
+}
+
+/* ── Tableau Kanban — 3 colonnes côte à côte ─────────────────────────────── */
+.kanban-board {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  overflow-x: auto;       /* défilement horizontal si la fenêtre est trop petite */
+  padding-bottom: 1rem;
+}
+
+/* ── Colonne ─────────────────────────────────────────────────────────────── */
+.kanban-column {
+  flex: 0 0 280px;        /* largeur fixe, pas de rétrécissement */
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* Hauteur max pour que le défilement interne des cartes fonctionne */
+  max-height: calc(100vh - 220px);
+  transition: box-shadow 0.15s ease;
+}
+
+/* Mise en évidence de la colonne survolée pendant un glissement */
+.kanban-column--drag-over {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* ── En-tête de colonne ──────────────────────────────────────────────────── */
+.kanban-column__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.kanban-column__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a1a;          /* texte sombre sur fond pastel clair */
+}
+
+/* Badge rond avec le nombre de tickets */
+.kanban-column__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.12);
+  color: #1a1a1a;
+}
+
+/* ── Zone de cartes (scrollable) ─────────────────────────────────────────── */
+.kanban-column__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Carte ───────────────────────────────────────────────────────────────── */
+.kanban-card {
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  user-select: none;       /* empêche la sélection de texte pendant le glissement */
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+
+.kanban-card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+}
+
+/* La carte source devient transparente pendant qu'elle est déplacée */
+.kanban-card--dragging {
+  opacity: 0.35;
+}
+
+.kanban-card__name {
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+/* ── Bouton "Ajouter 1 ticket" ────────────────────────────────────────────── */
+.kanban-column__add {
+  width: 100%;
+  padding: 0.5rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #444;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.kanban-column__add:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* ── Fond des modales ─────────────────────────────────────────────────────── */
+/* "position: fixed; inset: 0" couvre tout l'écran, quelle que soit la position
+   de l'élément dans le DOM. z-index élevé pour passer par-dessus tout le reste. */
+.kanban-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+/* ── Modale ──────────────────────────────────────────────────────────────── */
+.kanban-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Variante large pour la modale de détail */
+.kanban-modal--wide {
+  max-width: 620px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.kanban-modal h2 {
+  margin-top: 0;
+}
+
+.kanban-modal h3 {
+  font-size: 0.95rem;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  color: var(--text-h);
+}
+
+.kanban-modal__desc {
+  color: var(--text-muted);
+  margin-top: 0;
+}
+
+/* Champ de formulaire dans les modales */
+.kanban-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.kanban-modal__field input[type="text"],
+.kanban-modal__field textarea,
+.kanban-modal__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-h);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+
+.kanban-modal__field input[type="text"]:focus,
+.kanban-modal__field textarea:focus,
+.kanban-modal__textarea:focus {
+  border-color: var(--accent);
+}
+
+.kanban-modal__textarea {
+  display: block;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Boutons d'action de la modale (Annuler / Confirmer) */
+.kanban-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.kanban-modal__btn {
+  padding: 0.45rem 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.kanban-modal__btn--cancel {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.kanban-modal__btn--cancel:hover {
+  background: var(--surface);
+}
+
+.kanban-modal__btn--confirm {
+  background: var(--accent);
+  color: var(--text-h);
+}
+
+.kanban-modal__btn--confirm:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.kanban-modal__btn--confirm:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* Bouton de fermeture (✕) en haut à droite de la modale de détail */
+.kanban-modal__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.25rem;
+}
+
+.kanban-modal__close:hover {
+  color: var(--text);
+}
+
+/* Métadonnées dans la modale de détail */
+.kanban-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Description du ticket (pre-wrap pour respecter les sauts de ligne GLPI) */
+.kanban-modal__content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.kanban-modal__items {
+  color: var(--text);
+  font-size: 0.9rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.kanban-modal__error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}

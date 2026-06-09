@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 // FrontOffice : pages accessibles aux utilisateurs GLPI authentifiés (token OAuth2)
 import LoginPage           from './pages/frontoffice/LoginPage.jsx'
 import DashboardPage       from './pages/frontoffice/DashboardPage.jsx'
+import KanbanPage          from './pages/frontoffice/KanbanPage.jsx'
 import ElementsPage        from './pages/frontoffice/ElementsPage.jsx'
 import CreateElementPage   from './pages/frontoffice/CreateElementPage.jsx'
 import CreateTicketPage    from './pages/frontoffice/CreateTicketPage.jsx'
@@ -16,6 +17,7 @@ import BackofficeTicketsPage      from './pages/backoffice/TicketsPage.jsx'
 import BackofficeTicketDetailPage from './pages/backoffice/TicketDetailPage.jsx'
 import BackofficeElementsPage      from './pages/backoffice/ElementsPage.jsx'
 import BackofficeElementDetailPage from './pages/backoffice/ElementDetailPage.jsx'
+import BackofficeKanbanSettingsPage from './pages/backoffice/KanbanSettingsPage.jsx'
 import BackofficeResetPage        from './pages/backoffice/ResetPage.jsx'
 
 function App() {
@@ -45,6 +47,12 @@ function App() {
       <Route
         path="/"
         element={token ? <DashboardPage onLogout={() => setToken(null)} /> : <Navigate to="/login" replace />}
+      />
+
+      {/* FrontOffice : Kanban (Phase 11) — même garde par token. */}
+      <Route
+        path="/kanban"
+        element={token ? <KanbanPage onLogout={() => setToken(null)} /> : <Navigate to="/login" replace />}
       />
 
       {/* FrontOffice : recherche multicritère des éléments (Phase 6) — protégée
@@ -167,6 +175,16 @@ function App() {
         element={
           backofficeUnlocked
             ? <BackofficeElementDetailPage onLock={() => setBackofficeUnlocked(false)} />
+            : <Navigate to="/backoffice/login" replace />
+        }
+      />
+
+      {/* Paramètres Kanban : couleurs + labels malgaches — même garde. */}
+      <Route
+        path="/backoffice/kanban-settings"
+        element={
+          backofficeUnlocked
+            ? <BackofficeKanbanSettingsPage onLock={() => setBackofficeUnlocked(false)} />
             : <Navigate to="/backoffice/login" replace />
         }
       />

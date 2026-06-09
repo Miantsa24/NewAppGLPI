@@ -4,6 +4,7 @@
 // NavLink considère que "/elements" commence par "/" et active aussi ce lien).
 export const FRONTOFFICE_NAV_LINKS = [
   { to: '/',                    label: 'Tableau de bord',        end: true },
+  { to: '/kanban',              label: 'Kanban' },
   { to: '/elements',            label: 'Rechercher des éléments' },
   { to: '/elements/computers/new', label: 'Créer un ordinateur' },
   { to: '/elements/monitors/new',  label: 'Créer un écran' },

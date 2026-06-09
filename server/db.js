@@ -55,4 +55,33 @@ db.exec(`
   )
 `)
 
+// Paramètres du tableau Kanban (Phase 11/12) : 9 clés fixes.
+// On utilise une table clé/valeur plutôt qu'une table à colonnes fixes pour
+// pouvoir ajouter de nouveaux paramètres plus tard sans modifier le schéma.
+// "INSERT OR IGNORE" : ne touche pas aux lignes déjà présentes (ex. si
+// l'admin a déjà modifié une couleur, on ne l'écrase pas au redémarrage).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS kanban_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )
+`)
+
+const KANBAN_DEFAULTS = [
+  ['color_nouveau',        '#dbeafe'],
+  ['color_in_progress',    '#fde8c8'],
+  ['color_termine',        '#dcfce7'],
+  ['label_fr_nouveau',     'Nouveau'],
+  ['label_fr_in_progress', 'In progress'],
+  ['label_fr_termine',     'Terminé'],
+  ['label_mg_nouveau',     ''],
+  ['label_mg_in_progress', ''],
+  ['label_mg_termine',     '']
+]
+
+const insertDefault = db.prepare('INSERT OR IGNORE INTO kanban_settings (key, value) VALUES (?, ?)')
+for (const [key, value] of KANBAN_DEFAULTS) {
+  insertDefault.run(key, value)
+}
+
 export default db

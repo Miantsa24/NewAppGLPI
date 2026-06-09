@@ -120,6 +120,16 @@ export async function createItem(sessionToken, itemtype, input) {
   return response.data.id
 }
 
+// Met à jour les champs d'un item existant.
+// La v1 exige le wrapper "input" autour des champs modifiés — exactement comme
+// createItem qui exige aussi "input" (convention GLPI v1 pour toute écriture).
+export async function updateItem(sessionToken, itemtype, id, input) {
+  await axios.put(`${V1_URL}/${itemtype}/${id}`,
+    { input },
+    { headers: sessionHeaders(sessionToken, { 'Content-Type': 'application/json' }) }
+  )
+}
+
 // Supprime définitivement un item ("force_purge": true = suppression réelle,
 // pas une simple mise à la corbeille — cohérent avec l'objectif de Réinitialisation
 // qui doit effacer toute trace de l'import, pas juste la masquer).

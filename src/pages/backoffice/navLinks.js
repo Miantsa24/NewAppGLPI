@@ -10,6 +10,7 @@ export const BACKOFFICE_NAV_LINKS = [
   { to: '/backoffice/elements/computers', label: 'Ordinateurs' },
   { to: '/backoffice/elements/monitors',  label: 'Écrans' },
   { to: '/backoffice/elements/others',    label: 'Autres éléments' },
+  { to: '/backoffice/kanban-settings', label: 'Paramètres Kanban' },
   { to: '/backoffice/import',          label: 'Importer des données' },
   { to: '/backoffice/reset',           label: 'Réinitialiser les données' }
 ]
