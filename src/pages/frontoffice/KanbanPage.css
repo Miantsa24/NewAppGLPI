@@ -6,20 +6,27 @@
 
 .kanban-page__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .kanban-page__header h1 {
-  margin: 0;
+  margin: 0 0 4px;
+}
+
+.kanban-page__intro {
+  color: var(--text-muted);
 }
 
 .kanban-page__error {
   background: var(--danger-bg);
   color: var(--danger);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-bottom: 1rem;
 }
 
@@ -57,20 +64,23 @@
 /* ── Tableau Kanban — 3 colonnes côte à côte ─────────────────────────────── */
 .kanban-board {
   display: flex;
-  gap: 1rem;
+  gap: 3.5rem;
   align-items: flex-start;
   overflow-x: auto;       /* défilement horizontal si la fenêtre est trop petite */
-  padding-bottom: 1rem;
+  padding: 0.25rem 0.25rem 1rem;
 }
 
 /* ── Colonne ─────────────────────────────────────────────────────────────── */
+/* Le fond coloré (pastel) vient des paramètres Kanban (admin) — posé en
+   inline style ("background: bgColor"). Le texte reste sombre (#1a1a1a),
+   pensé pour rester lisible quelle que soit la teinte choisie. */
 .kanban-column {
-  flex: 0 0 280px;        /* largeur fixe, pas de rétrécissement */
-  border-radius: 10px;
-  padding: 0.75rem;
+  flex: 0 0 300px;        /* largeur fixe, pas de rétrécissement */
+  border-radius: 12px;
+  padding: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1.5rem;
   /* Hauteur max pour que le défilement interne des cartes fonctionne */
   max-height: calc(100vh - 220px);
   transition: box-shadow 0.15s ease;
@@ -86,12 +96,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.25rem;
 }
 
 .kanban-column__title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #1a1a1a;          /* texte sombre sur fond pastel clair */
 }
@@ -101,11 +110,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 0.4rem;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 0.45rem;
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   background: rgba(0, 0, 0, 0.12);
   color: #1a1a1a;
@@ -115,7 +124,7 @@
 .kanban-column__cards {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1.25rem;
   overflow-y: auto;
   flex: 1;
 }
@@ -123,8 +132,8 @@
 /* ── Carte ───────────────────────────────────────────────────────────────── */
 .kanban-card {
   background: #ffffff;
-  border-radius: 6px;
-  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   cursor: grab;
   user-select: none;       /* empêche la sélection de texte pendant le glissement */
@@ -132,7 +141,8 @@
 }
 
 .kanban-card:hover {
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
 }
 
 .kanban-card:active {
@@ -153,20 +163,22 @@
 /* ── Bouton "Ajouter 1 ticket" ────────────────────────────────────────────── */
 .kanban-column__add {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.65rem;
   font-family: inherit;
   font-size: 0.85rem;
-  color: #444;
-  background: rgba(0, 0, 0, 0.05);
+  font-weight: 500;
+  color: #1a1a1a;
+  background: rgba(255, 255, 255, 0.5);
   border: 1px dashed rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
   transition: background 0.15s ease;
+  box-sizing: border-box;
 }
 
 .kanban-column__add:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 /* ── Fond des modales ─────────────────────────────────────────────────────── */
@@ -185,14 +197,14 @@
 
 /* ── Modale ──────────────────────────────────────────────────────────────── */
 .kanban-modal {
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1.5rem;
   width: 100%;
   max-width: 480px;
   position: relative;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow);
 }
 
 /* Variante large pour la modale de détail */
@@ -352,5 +364,5 @@
   background: var(--danger-bg);
   color: var(--danger);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
 }

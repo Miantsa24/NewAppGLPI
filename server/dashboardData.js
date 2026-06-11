@@ -10,6 +10,7 @@
 
 import * as glpi from './glpiV1Client.js'
 import { ASSET_TYPES } from '../shared/assetTypes.js'
+import { TICKET_STATUSES } from './ticketsData.js'
 
 // Codes numériques du champ "type" d'un Ticket dans GLPI (vérifiés par un test
 // réel : voir docs internes — Ticket::INCIDENT_TYPE = 1, Ticket::DEMAND_TYPE = 2).
@@ -31,7 +32,13 @@ export async function getDashboardStats() {
     // Ici on récupère la liste complète (les volumes de tickets sont petits pour
     // ce projet) et on regroupe par "type" côté JavaScript — plus simple que
     // d'apprendre la syntaxe de recherche avancée de GLPI pour un si petit besoin.
-    const tickets = await glpi.listItems(sessionToken, 'Ticket')
+    // "allCosts" est récupéré EN MÊME TEMPS (Promise.all) : chaque appel GLPI a un
+    // coût fixe d'environ 0.5s (bootstrap PHP), donc paralléliser les deux appels
+    // indépendants évite de payer ce coût deux fois de suite.
+    const [tickets, allCosts] = await Promise.all([
+      glpi.listItems(sessionToken, 'Ticket'),
+      glpi.listItems(sessionToken, 'TicketCost')
+    ])
 
     const countByType = new Map()
     for (const ticket of tickets) {
@@ -44,11 +51,38 @@ export async function getDashboardStats() {
       count: countByType.get(Number(typeCode)) ?? 0
     }))
 
+    // ── Comptage des tickets par statut ───────────────────────────────────────
+    // Même principe que ticketsByType, mais sur le champ "status" — affiché
+    // dans le Dashboard avec les mêmes couleurs que les pastilles de TicketsPage.
+    const countByStatus = new Map()
+    for (const ticket of tickets) {
+      countByStatus.set(ticket.status, (countByStatus.get(ticket.status) ?? 0) + 1)
+    }
+
+    const ticketsByStatus = Object.entries(TICKET_STATUSES).map(([statusCode, label]) => ({
+      status: Number(statusCode),
+      label,
+      count:  countByStatus.get(Number(statusCode)) ?? 0
+    }))
+
+    // ── Coûts des tickets ──────────────────────────────────────────────────────
+    // "allCosts" (récupéré ci-dessus en parallèle des tickets) contient TOUS les
+    // TicketCost de GLPI en un seul appel — pas un appel par ticket : avec ~0.5s
+    // par appel GLPI, faire un appel par ticket rendrait le Dashboard inutilisable
+    // dès que le nombre de tickets devient important (ex. 121 tickets → ~60s).
+    const totalCostsCount  = allCosts.length
+    const totalCostAmount  = allCosts.reduce(
+      (sum, c) => sum + Number(c.cost_time ?? 0) + Number(c.cost_fixed ?? 0), 0
+    )
+
     return {
       elements,
       totalElements,
       ticketsByType,
-      totalTickets: tickets.length
+      ticketsByStatus,
+      totalTickets: tickets.length,
+      totalCostsCount,
+      totalCostAmount
     }
   } finally {
     await glpi.closeSession(sessionToken)

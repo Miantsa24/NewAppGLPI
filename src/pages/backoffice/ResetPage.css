@@ -1,12 +1,24 @@
 .reset-page {
-  max-width: 800px;
-  margin: 2rem auto;
   font-family: var(--sans);
   text-align: left;
 }
 
+.reset-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .reset-page__intro {
   color: var(--text-muted);
+}
+
+.reset-page__panel {
+  max-width: 800px;
+  background: var(--surface);
+  border: 1px solid rgba(229, 83, 75, 0.35);
+  border-radius: 10px;
+  padding: 1.5rem;
 }
 
 .reset-page__button {
@@ -84,14 +96,15 @@
 }
 
 .reset-page__result {
-  margin-top: 1rem;
+  max-width: 800px;
+  margin-top: 1.5rem;
 }
 
 .reset-page__success {
   color: var(--success);
   background: var(--success-bg);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-bottom: 1rem;
 }
 
@@ -102,12 +115,12 @@
   border: 1px solid var(--border);
   color: var(--text);
   padding: 1rem;
-  border-radius: 6px;
+  border-radius: 10px;
 }
 
 .reset-page__error {
   background: var(--danger-bg);
   color: var(--danger);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
 }

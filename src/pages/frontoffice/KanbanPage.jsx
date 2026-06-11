@@ -4,15 +4,18 @@ import Layout from '../../components/Layout.jsx'
 import { FRONTOFFICE_NAV_LINKS } from './navLinks.js'
 import './KanbanPage.css'
 
+// Le projet n'utilise que 3 statuts de ticket GLPI : Nouveau (1), En cours/attribué
+// (2) et Clos (6) — voir aussi TICKET_STATUSES dans server/ticketsData.js et
+// server/importPipeline.js. Les 3 colonnes du Kanban correspondent 1:1 à ces statuts.
 const COLUMN_DEFS = [
-  { key: 'nouveau',     glpiStatuses: [1],       targetStatus: 1 },
-  { key: 'in_progress', glpiStatuses: [2, 3, 4], targetStatus: 2 },
-  { key: 'termine',     glpiStatuses: [5, 6],    targetStatus: 5 }
+  { key: 'nouveau',     glpiStatuses: [1], targetStatus: 1 },
+  { key: 'in_progress', glpiStatuses: [2], targetStatus: 2 },
+  { key: 'termine',     glpiStatuses: [6], targetStatus: 6 }
 ]
 
 function columnKeyFor(status) {
   if (status === 1) return 'nouveau'
-  if ([2, 3, 4].includes(status)) return 'in_progress'
+  if (status === 2) return 'in_progress'
   return 'termine'
 }
 
@@ -249,12 +252,12 @@ function KanbanPage() {
   async function handleSolveConfirm(solutionText) {
     const { ticketId } = solveTarget
     setSolveTarget(null)
-    setTickets(ts => ts.map(t => t.id === ticketId ? { ...t, status: 5 } : t))
+    setTickets(ts => ts.map(t => t.id === ticketId ? { ...t, status: 6 } : t))
     try {
       const r = await fetch(`http://localhost:3001/api/frontoffice/kanban-tickets/${ticketId}/status`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ status: 5, solution: solutionText })
+        body:    JSON.stringify({ status: 6, solution: solutionText })
       })
       const data = await r.json().catch(() => ({}))
       if (!data.ok) {
@@ -280,8 +283,11 @@ function KanbanPage() {
       navLinks={FRONTOFFICE_NAV_LINKS}
     >
     <div className="kanban-page">
-      <div className="kanban-page__header">
-        <h1>Kanban</h1>
+      <header className="kanban-page__header">
+        <div>
+          <h1>Kanban</h1>
+          <p className="kanban-page__intro">Glissez-déposez les tickets pour faire évoluer leur statut.</p>
+        </div>
         <div className="kanban-page__lang">
           <button
             className={`kanban-lang-btn ${lang === 'fr' ? 'kanban-lang-btn--active' : ''}`}
@@ -292,7 +298,7 @@ function KanbanPage() {
             onClick={() => setLang('mg')}
           >MG</button>
         </div>
-      </div>
+      </header>
 
       {loading && <p>Chargement…</p>}
 

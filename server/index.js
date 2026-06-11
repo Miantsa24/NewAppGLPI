@@ -7,8 +7,8 @@ import multer  from 'multer'
 import db      from './db.js'
 import { runImport, resetImportedData } from './importPipeline.js'
 import { getDashboardStats } from './dashboardData.js'
-import { listTickets, getTicketDetail, listTicketsForKanban } from './ticketsData.js'
-import { listElements, getElementDetail } from './elementsData.js'
+import { listTickets, getTicketDetail, listTicketsForKanban, listTicketCosts, updateTicket, deleteTicket } from './ticketsData.js'
+import { listElements, getElementDetail, getElementImage } from './elementsData.js'
 import { getKanbanSettings, updateKanbanSettings, getKanbanHistory } from './kanbanSettings.js'
 import { createTicketWithItems, addTicketCost } from './ticketCreation.js'
 import * as glpiV1 from './glpiV1Client.js'
@@ -48,6 +48,20 @@ app.post('/api/backoffice/login', (req, res) => {
   }
 })
 
+// ── Protection serveur des opérations Backoffice sensibles ────────────────────
+// /api/backoffice/login ne renvoie qu'un "oui/non" : la véritable porte d'entrée,
+// côté frontend, est ProtectedRoute (sessionStorage). Mais rien n'empêchait un
+// appel direct (sans passer par l'UI) vers les opérations qui ÉCRIVENT dans GLPI
+// ou suppriment des données — ce middleware exige le même code unique, renvoyé
+// par le client dans l'en-tête "X-Backoffice-Code", pour ces routes précises.
+function requireBackofficeCode(req, res, next) {
+  const code = req.get('X-Backoffice-Code')
+  if (!code || code !== process.env.BACKOFFICE_CODE) {
+    return res.status(401).json({ ok: false, error: 'Code backoffice requis ou invalide' })
+  }
+  next()
+}
+
 // ── Import des 4 fichiers (Backoffice, Phase 2) ────────────────────────────────
 // "multer" est un middleware Express qui sait lire un corps "multipart/form-data"
 // (le format utilisé par <input type="file">) et le transformer en objets JS
@@ -60,6 +74,7 @@ const upload = multer({ storage: multer.memoryStorage() })
 // upload.fields([...]) : on attend PLUSIEURS champs de fichiers nommés, chacun
 // avec au plus 1 fichier (maxCount: 1) — un champ par fichier attendu du formulaire.
 app.post('/api/backoffice/import',
+  requireBackofficeCode,
   upload.fields([
     { name: 'feuille1', maxCount: 1 },
     { name: 'feuille2', maxCount: 1 },
@@ -125,7 +140,7 @@ app.get('/api/backoffice/dashboard', async (req, res) => {
 // dans l'ordre inverse de création (LIFO — voir resetImportedData), puis vide
 // le journal. Pas de paramètres : l'opération porte sur "tout ce que le journal
 // connaît", pas sur une sélection — d'où un simple POST sans corps.
-app.post('/api/backoffice/reset', async (req, res) => {
+app.post('/api/backoffice/reset', requireBackofficeCode, async (req, res) => {
   // Même pattern SSE que l'import — le client voit la suppression item par item.
   res.writeHead(200, {
     'Content-Type':    'text/event-stream',
@@ -177,8 +192,55 @@ app.get('/api/backoffice/tickets/:id', async (req, res) => {
   }
 })
 
+// ── Page Tickets : modification (Backoffice uniquement) ────────────────────────
+// "fields" : { name, content, type, status, priority } — mêmes codes que ceux
+// renvoyés par describeTicket (typeId/statusId/priorityId).
+app.put('/api/backoffice/tickets/:id', requireBackofficeCode, async (req, res) => {
+  try {
+    const { name, content, type, status, priority } = req.body
+    if (!name) return res.status(400).json({ ok: false, error: 'name est requis' })
+
+    await updateTicket(req.params.id, {
+      name,
+      content:  content ?? '',
+      type:     parseInt(type, 10),
+      status:   parseInt(status, 10),
+      priority: parseInt(priority, 10)
+    })
+    res.json({ ok: true })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[tickets/:id PUT] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  }
+})
+
+// ── Page Tickets : suppression (Backoffice uniquement) ──────────────────────────
+app.delete('/api/backoffice/tickets/:id', requireBackofficeCode, async (req, res) => {
+  try {
+    await deleteTicket(req.params.id)
+    res.json({ ok: true })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[tickets/:id DELETE] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  }
+})
+
+// ── Backoffice : liste de tous les coûts (toutes tickets confondus) ───────────
+app.get('/api/backoffice/costs', async (req, res) => {
+  try {
+    const costs = await listTicketCosts()
+    res.json({ ok: true, costs })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[costs GET] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  }
+})
+
 // ── Backoffice : ajout d'un coût à un ticket existant ──────────────────────────
-app.post('/api/backoffice/costs', async (req, res) => {
+app.post('/api/backoffice/costs', requireBackofficeCode, async (req, res) => {
   try {
     const { ticketId, name, actiontime, costTime, costFixed } = req.body
     if (!ticketId) return res.status(400).json({ ok: false, error: 'ticketId est requis' })
@@ -226,6 +288,23 @@ app.get('/api/backoffice/elements/:itemtype/:id', async (req, res) => {
   }
 })
 
+// ── Image associée à un élément (import ZIP) ───────────────────────────────────
+// Sert de proxy vers le Document GLPI lié à l'élément — le frontend peut
+// l'utiliser directement comme src="" d'une <img>. 404 si aucune image n'est
+// associée (le frontend affiche alors un visuel de remplacement via onError).
+app.get('/api/backoffice/elements/:itemtype/:id/image', async (req, res) => {
+  try {
+    const image = await getElementImage(req.params.itemtype, req.params.id)
+    if (!image) return res.status(404).end()
+    res.set('Content-Type', image.contentType ?? 'application/octet-stream')
+    res.send(Buffer.from(image.data))
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[elements/:id/image] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(404).end()
+  }
+})
+
 // ── Paramètres Kanban ─────────────────────────────────────────────────────────
 // GET : accessible par le FrontOffice ET le Backoffice (pas de garde) — les
 // paramètres (couleurs, labels) ne sont pas sensibles, tout le monde peut les lire.
@@ -242,7 +321,7 @@ app.get('/api/kanban/settings', (req, res) => {
   }
 })
 
-app.put('/api/backoffice/kanban/settings', (req, res) => {
+app.put('/api/backoffice/kanban/settings', requireBackofficeCode, (req, res) => {
   try {
     const settings = updateKanbanSettings(req.body)
     res.json({ ok: true, settings })
@@ -337,10 +416,11 @@ app.use('/api/glpi', async (req, res) => {
 // On passe par v1 (session serveur) plutôt que par le proxy v2 pour deux raisons :
 //   1. Le proxy v2 filtre les tickets selon le token de l'utilisateur connecté —
 //      il peut ne pas avoir le droit de modifier des tickets créés par l'import.
-//   2. Pour "Terminé" (statut 5), GLPI exige une solution ; en v1, createItem
-//      sur ITILSolution résout LE ticket ET enregistre la solution en un seul appel.
-//      L'équivalent via sous-ressource v2 n'est pas disponible sur cette version.
-// Body : { status: 1|2|5, solution?: "..." }  (solution requis quand status === 5)
+//   2. Pour "Clos" (statut 6), GLPI exige une solution ; en v1, createItem
+//      sur ITILSolution enregistre la solution et résout le ticket. On force
+//      ensuite le statut à 6 — le projet n'utilise QUE 3 statuts (Nouveau,
+//      En cours/attribué, Clos), pas d'étape intermédiaire "Résolu" visible.
+// Body : { status: 1|2|6, solution?: "..." }  (solution requis quand status === 6)
 app.patch('/api/frontoffice/kanban-tickets/:id/status', async (req, res) => {
   const ticketId = req.params.id
   const { status, solution } = req.body
@@ -349,14 +429,15 @@ app.patch('/api/frontoffice/kanban-tickets/:id/status', async (req, res) => {
 
   const sessionToken = await glpiV1.openSession()
   try {
-    if (status === 5) {
-      // Créer une ITILSolution en v1 : GLPI résout automatiquement le ticket
-      // et enregistre la solution. Pas besoin de PATCH le statut séparément.
+    if (status === 6) {
+      // Créer une ITILSolution en v1 (résout le ticket et enregistre la solution),
+      // puis forcer explicitement le statut à "Clos" (6).
       await glpiV1.createItem(sessionToken, 'ITILSolution', {
         itemtype: 'Ticket',
         items_id: Number(ticketId),
         content:  solution || '(résolu)'
       })
+      await glpiV1.updateItem(sessionToken, 'Ticket', ticketId, { status: 6 })
     } else {
       // Changement simple de statut (ex. Nouveau ↔ In progress)
       await glpiV1.updateItem(sessionToken, 'Ticket', ticketId, { status })
@@ -387,11 +468,30 @@ app.get('/api/frontoffice/kanban-tickets', async (req, res) => {
   }
 })
 
+// ── Find-or-create d'une donnée de référence (Location, State, Manufacturer,
+// User, <Itemtype>Model) pour la création d'élément FrontOffice ci-dessous.
+// Même principe que findOrCreate() dans importPipeline.js : un Computer ne
+// stocke pas le texte "Dell" mais l'id d'une ligne Manufacturer. La nouvelle
+// ligne créée est journalisée pour que la réinitialisation puisse la supprimer.
+async function findOrCreateRef(sessionToken, itemtype, name) {
+  if (!name) return 0
+  const existingItems = await glpiV1.listItems(sessionToken, itemtype)
+  const found = existingItems.find(item => item.name === name)
+  if (found) return found.id
+
+  const id = await glpiV1.createItem(sessionToken, itemtype, { name })
+  db.prepare('INSERT INTO import_journal (glpi_itemtype, glpi_id, label) VALUES (?, ?, ?)').run(itemtype, id, name)
+  return id
+}
+
 // ── Création d'élément FrontOffice (session v1 serveur, journalisé) ───────────
 // Pas de token utilisateur requis — on utilise la session v1 (credentials serveur).
 // L'élément est ajouté à import_journal pour que la réinitialisation le supprime.
+// Champs alignés sur les colonnes du CSV d'import (voir importPipeline.js) :
+// Name, Status, Location, Manufacturer, Item_Type (= itemtype, fixé par la page),
+// Model, Inventory_Number, User.
 app.post('/api/frontoffice/elements', async (req, res) => {
-  const { itemtype, name, serial, otherserial, comment } = req.body
+  const { itemtype, name, status, location, manufacturer, model, inventoryNumber, user } = req.body
 
   if (!VALID_ITEMTYPES.includes(itemtype)) {
     return res.status(400).json({ ok: false, error: `itemtype invalide : ${itemtype}` })
@@ -403,9 +503,31 @@ app.post('/api/frontoffice/elements', async (req, res) => {
   const sessionToken = await glpiV1.openSession()
   try {
     const fields = { name }
-    if (serial)      fields.serial      = serial
-    if (otherserial) fields.otherserial = otherserial
-    if (comment)     fields.comment     = comment
+    if (inventoryNumber) fields.serial = inventoryNumber
+
+    const [locationId, manufacturerId, stateId, userId] = await Promise.all([
+      findOrCreateRef(sessionToken, 'Location', location),
+      findOrCreateRef(sessionToken, 'Manufacturer', manufacturer),
+      findOrCreateRef(sessionToken, 'State', status),
+      findOrCreateRef(sessionToken, 'User', user)
+    ])
+    if (locationId)     fields.locations_id     = locationId
+    if (manufacturerId) fields.manufacturers_id = manufacturerId
+    if (stateId)        fields.states_id        = stateId
+    if (userId)         fields.users_id         = userId
+
+    // Convention "<Type>Model" / "<type>models_id" (voir importPipeline.js) —
+    // certains types n'ont pas de table de modèles : on ignore alors le champ
+    // plutôt que de faire échouer toute la création.
+    if (model) {
+      const modelType  = `${itemtype}Model`
+      const modelField = `${itemtype.toLowerCase()}models_id`
+      try {
+        fields[modelField] = await findOrCreateRef(sessionToken, modelType, model)
+      } catch {
+        console.warn(`[frontoffice/elements POST] Modèle "${model}" ignoré : "${modelType}" n'existe pas dans GLPI.`)
+      }
+    }
 
     const id = await glpiV1.createItem(sessionToken, itemtype, fields)
     db.prepare('INSERT INTO import_journal (glpi_itemtype, glpi_id, label) VALUES (?, ?, ?)').run(itemtype, id, name)
@@ -464,18 +586,28 @@ app.get('/api/frontoffice/elements', async (req, res) => {
 
   const sessionToken = await glpiV1.openSession()
   try {
-    // On parallélise les 4 appels GLPI pour minimiser le temps d'attente total.
-    const [items, locations, states, manufacturers] = await Promise.all([
+    // "<Itemtype>Model" / "<itemtype>models_id" : même convention que l'import
+    // (voir importPipeline.js) — Computer/Monitor/Phone ont chacun leur table
+    // de modèles (ComputerModel, MonitorModel, PhoneModel).
+    const modelType  = `${itemtype}Model`
+    const modelField = `${itemtype.toLowerCase()}models_id`
+
+    // On parallélise les appels GLPI pour minimiser le temps d'attente total.
+    const [items, locations, states, manufacturers, models, users] = await Promise.all([
       glpiV1.listItems(sessionToken, itemtype),
       glpiV1.listItems(sessionToken, 'Location'),
       glpiV1.listItems(sessionToken, 'State'),
-      glpiV1.listItems(sessionToken, 'Manufacturer')
+      glpiV1.listItems(sessionToken, 'Manufacturer'),
+      glpiV1.listItems(sessionToken, modelType),
+      glpiV1.listItems(sessionToken, 'User')
     ])
 
     // Tables de correspondance id → nom, pour résoudre les champs *_id de la v1.
     const locationById     = new Map(locations.map(x => [x.id, x.name]))
     const stateById        = new Map(states.map(x => [x.id, x.name]))
     const manufacturerById = new Map(manufacturers.map(x => [x.id, x.name]))
+    const modelById        = new Map(models.map(x => [x.id, x.name]))
+    const userById         = new Map(users.map(x => [x.id, x.name]))
 
     const results = items
       // Résolution des IDs en noms + format v2-compatible attendu par le frontend.
@@ -485,7 +617,9 @@ app.get('/api/frontoffice/elements', async (req, res) => {
         serial:       item.serial ?? null,
         location:     { name: locationById.get(item.locations_id)     ?? null },
         status:       { name: stateById.get(item.states_id)           ?? null },
-        manufacturer: { name: manufacturerById.get(item.manufacturers_id) ?? null }
+        manufacturer: { name: manufacturerById.get(item.manufacturers_id) ?? null },
+        model:        { name: modelById.get(item[modelField])         ?? null },
+        user:         { name: userById.get(item.users_id)             ?? null }
       }))
       // Filtrage côté serveur : chaque paramètre est optionnel.
       // Nom : recherche "contient" (insensible à la casse).

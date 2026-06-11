@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
+import { clearBackofficeSession } from './api.js'
+import { ASSET_TYPES } from '../../../shared/assetTypes.js'
 import './ElementDetailPage.css'
 
 // Retrouve la page-liste d'origine à partir du type GLPI de l'élément affiché —
@@ -11,6 +13,12 @@ function listPathFor(itemtype) {
   if (itemtype === 'Computer') return '/backoffice/elements/computers'
   if (itemtype === 'Monitor')  return '/backoffice/elements/monitors'
   return '/backoffice/elements/others'
+}
+
+// Libellé lisible du type GLPI (ex. "Computer" → "Ordinateurs") — repris de la
+// même source que les menus et le dashboard (shared/assetTypes.js).
+function itemTypeLabel(itemtype) {
+  return ASSET_TYPES.find(t => t.itemtype === itemtype)?.label ?? itemtype
 }
 
 const LIST_LABELS = {
@@ -28,7 +36,7 @@ function BackofficeElementDetailPage({ onLock }) {
   const navigate = useNavigate()
 
   function lock() {
-    sessionStorage.removeItem('backoffice_unlocked')
+    clearBackofficeSession()
     onLock()
     navigate('/backoffice/login')
   }
@@ -83,9 +91,9 @@ function BackofficeElementDetailPage({ onLock }) {
       onAction={lock}
     >
     <div className="element-detail-page">
-      <p className="element-detail-page__back">
-        <Link to={listPath}>← Retour à {LIST_LABELS[listPath.split('/').pop()]}</Link>
-      </p>
+      <Link to={listPath} className="element-detail-page__back">
+        ← Retour à {LIST_LABELS[listPath.split('/').pop()]}
+      </Link>
 
       {loading && <p>Chargement…</p>}
 
@@ -97,22 +105,60 @@ function BackofficeElementDetailPage({ onLock }) {
 
       {element && (
         <>
-          <h1>{element.name}</h1>
+          <h1 className="element-detail-page__title">{element.name}</h1>
 
-          <div className="element-detail-page__meta">
-            <p><strong>Emplacement :</strong> {element.location ?? '—'}</p>
-            <p><strong>Fabricant :</strong> {element.manufacturer ?? '—'}</p>
-            <p><strong>Statut :</strong> {element.status ?? '—'}</p>
-            <p><strong>N° de série :</strong> {element.serial ?? '—'}</p>
-            <p><strong>Autre n° de série :</strong> {element.otherserial ?? '—'}</p>
+          <div className="element-detail-page__main">
+            <div className="element-detail-page__image">
+              <img
+                src={`http://localhost:3001/api/backoffice/elements/${itemtype}/${id}/image`}
+                alt=""
+                onError={e => { e.currentTarget.style.display = 'none' }}
+              />
+              <span className="element-detail-page__placeholder" aria-hidden="true">
+                {itemtype[0]}
+              </span>
+            </div>
+
+            <dl className="element-detail-page__info">
+              <div className="element-detail-page__info-row">
+                <dt>Nom</dt>
+                <dd>{element.name}</dd>
+              </div>
+              <div className="element-detail-page__info-row">
+                <dt>Statut</dt>
+                <dd>{element.status ?? '—'}</dd>
+              </div>
+              <div className="element-detail-page__info-row">
+                <dt>Emplacement</dt>
+                <dd>{element.location ?? '—'}</dd>
+              </div>
+              <div className="element-detail-page__info-row">
+                <dt>Fabricant</dt>
+                <dd>{element.manufacturer ?? '—'}</dd>
+              </div>
+              <div className="element-detail-page__info-row">
+                <dt>Type</dt>
+                <dd>{itemTypeLabel(itemtype)}</dd>
+              </div>
+              <div className="element-detail-page__info-row">
+                <dt>Modèle</dt>
+                <dd>{element.model ?? '—'}</dd>
+              </div>
+              <div className="element-detail-page__info-row">
+                <dt>N° d'inventaire</dt>
+                <dd>{element.serial ?? '—'}</dd>
+              </div>
+            </dl>
           </div>
 
-          <h2>Commentaire</h2>
-          {/* white-space: pre-wrap (voir CSS) : GLPI conserve les sauts de
-              ligne du commentaire — sans cette règle ils seraient ignorés. */}
-          <p className="element-detail-page__content">
-            {element.comment || '(aucun commentaire)'}
-          </p>
+          <section className="element-detail-page__section">
+            <h2>Commentaire</h2>
+            {/* white-space: pre-wrap (voir CSS) : GLPI conserve les sauts de
+                ligne du commentaire — sans cette règle ils seraient ignorés. */}
+            <p className="element-detail-page__content">
+              {element.comment || '(aucun commentaire)'}
+            </p>
+          </section>
         </>
       )}
     </div>

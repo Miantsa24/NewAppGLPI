@@ -13,6 +13,10 @@
   --accent-bg:    rgba(79, 158, 255, 0.12);
   --accent-border: rgba(79, 158, 255, 0.4);
   --accent-hover: #74b3ff;
+  /* Second accent — distingue la section "Tickets" de la section "Éléments"
+     dans le Dashboard Backoffice (bordure + badge de total). */
+  --accent-2:     #2dd4bf;
+  --accent-2-bg:  rgba(45, 212, 191, 0.12);
   --danger:       #e5534b;
   --danger-bg:    rgba(229, 83, 75, 0.12);
   --danger-hover: #f06a62;
@@ -46,11 +50,7 @@ body {
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  width: 100%;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -60,26 +60,25 @@ body {
 h1,
 h2 {
   font-family: var(--heading);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-h);
 }
 
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
   @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+    font-size: 24px;
   }
 }
 h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
+  font-size: 18px;
+  line-height: 130%;
+  letter-spacing: -0.01em;
+  margin: 24px 0 12px;
   @media (max-width: 1024px) {
-    font-size: 20px;
+    font-size: 16px;
   }
 }
 p {

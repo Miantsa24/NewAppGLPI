@@ -1,63 +1,127 @@
 .backoffice-elements-page {
-  max-width: 900px;
-  margin: 2rem auto;
   font-family: var(--sans);
   text-align: left;
+}
+
+.backoffice-elements-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .backoffice-elements-page__intro {
   color: var(--text-muted);
 }
 
-.backoffice-elements-page__type {
-  margin-bottom: 1rem;
-}
-
-.backoffice-elements-page__type select {
-  padding: 0.4rem 0.6rem;
-  font-family: inherit;
-  font-size: 0.95rem;
-  color: var(--text-h);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
 .backoffice-elements-page__error {
   background: var(--danger-bg);
   color: var(--danger);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
-.backoffice-elements-page__table {
+.backoffice-elements-page__empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* ── Grille de cartes ────────────────────────────────────────────────────── */
+.backoffice-elements-page__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.element-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.element-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+/* Vignette : l'image (si l'élément en a une, voir Document_Item côté GLPI)
+   recouvre une "lettre" de remplacement — si l'image échoue à charger (404 :
+   pas d'image associée), onError la masque et la lettre redevient visible. */
+.element-card__image {
+  position: relative;
   width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.backoffice-elements-page__table th {
-  text-align: left;
-  padding: 0.5rem;
-  border-bottom: 2px solid var(--border);
+.element-card__image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.element-card__placeholder {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.element-card__body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.element-card__name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--text-h);
 }
 
-.backoffice-elements-page__table td {
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--border);
+.element-card__details {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.backoffice-elements-page__table tbody tr:hover {
-  background: var(--surface);
+.element-card__details > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.85rem;
 }
 
-.backoffice-elements-page__table a {
-  color: var(--accent);
-  text-decoration: none;
+.element-card__details dt {
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
-.backoffice-elements-page__table a:hover {
-  color: var(--accent-hover);
-  text-decoration: underline;
+.element-card__details dd {
+  margin: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

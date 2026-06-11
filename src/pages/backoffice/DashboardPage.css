@@ -1,8 +1,12 @@
 .backoffice-dashboard-page {
-  max-width: 900px;
-  margin: 2rem auto;
   font-family: var(--sans);
   text-align: left;
+}
+
+.backoffice-dashboard-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .backoffice-dashboard-page__intro {
@@ -13,39 +17,121 @@
   background: var(--danger-bg);
   color: var(--danger);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
-.backoffice-dashboard-page__section-title {
-  margin-top: 2rem;
+/* Chaque section ("Éléments", "Tickets") est maintenant un bloc à part entière
+   — bordure de gauche colorée pour bien les distinguer au premier coup d'œil. */
+.backoffice-dashboard-page__section {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 12px;
+}
+
+.backoffice-dashboard-page__section:first-of-type {
+  margin-top: 0;
+}
+
+.backoffice-dashboard-page__section--elements {
+  border-left-color: var(--accent);
+}
+
+.backoffice-dashboard-page__section--tickets {
+  border-left-color: var(--accent-2);
+}
+
+.backoffice-dashboard-page__section h2 {
+  margin: 0;
+}
+
+/* En-tête de section : titre + badge du total, côte à côte. */
+.backoffice-dashboard-page__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Badge du total — bien visible (gros chiffre + pastille arrondie), couleur
+   assortie à la bordure de la section (accent pour Éléments, accent-2 pour Tickets). */
+.backoffice-dashboard-page__total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: var(--accent-bg);
+  border-radius: 999px;
+}
+
+.backoffice-dashboard-page__section--tickets .backoffice-dashboard-page__total {
+  background: var(--accent-2-bg);
+}
+
+.backoffice-dashboard-page__total-count {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.backoffice-dashboard-page__section--tickets .backoffice-dashboard-page__total-count {
+  color: var(--accent-2);
+}
+
+.backoffice-dashboard-page__total-label {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Sous-titres "Par type" / "Par statut" à l'intérieur de la section Tickets. */
+.backoffice-dashboard-page__subheading {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.backoffice-dashboard-page__subheading:first-of-type {
+  margin-top: 0;
 }
 
 .backoffice-dashboard-page__cards {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1rem;
-  flex-wrap: wrap;
 }
 
 .stat-card {
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
-  min-width: 160px;
+  border-top: 3px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
   text-align: center;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .stat-card:hover {
   border-color: var(--accent-border);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
 }
 
 .stat-card__count {
   font-size: 2rem;
-  font-weight: bold;
+  font-weight: 700;
   color: var(--accent);
 }
 
 .stat-card__label {
-  color: var(--text);
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }

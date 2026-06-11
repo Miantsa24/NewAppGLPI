@@ -24,8 +24,15 @@ function App() {
   // Même principe qu'avant : un booléen en sessionStorage pour le code backoffice.
   // sessionStorage survit aux rechargements MAIS pas à la fermeture de l'onglet —
   // adapté à un accès "backoffice" temporaire.
+  // On exige aussi "backoffice_code" : une session ouverte AVANT l'ajout de
+  // l'en-tête "X-Backoffice-Code" (requireBackofficeCode côté serveur) a
+  // "backoffice_unlocked=true" mais pas le code mémorisé — sans ce check, les
+  // requêtes vers les routes protégées (import/reset/...) échoueraient en 401
+  // sans que l'utilisateur comprenne pourquoi. On la traite comme verrouillée,
+  // ce qui renvoie vers LoginPage et remémorise le code.
   const [backofficeUnlocked, setBackofficeUnlocked] = useState(
     () => sessionStorage.getItem('backoffice_unlocked') === 'true'
+        && !!sessionStorage.getItem('backoffice_code')
   )
 
   return (

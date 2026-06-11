@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
+import { clearBackofficeSession, backofficeFetch } from './api.js'
 import './KanbanSettingsPage.css'
 
 const COLUMNS = [
@@ -37,7 +38,7 @@ function BackofficeKanbanSettingsPage({ onLock }) {
   const navigate = useNavigate()
 
   function lock() {
-    sessionStorage.removeItem('backoffice_unlocked')
+    clearBackofficeSession()
     onLock()
     navigate('/backoffice/login')
   }
@@ -101,7 +102,7 @@ function BackofficeKanbanSettingsPage({ onLock }) {
     setSaveResult(null)
 
     try {
-      const response = await fetch('http://localhost:3001/api/backoffice/kanban/settings', {
+      const response = await backofficeFetch('http://localhost:3001/api/backoffice/kanban/settings', {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -137,11 +138,13 @@ function BackofficeKanbanSettingsPage({ onLock }) {
       onAction={lock}
     >
     <div className="kanban-settings-page">
-      <h1>Paramètres du Kanban</h1>
-      <p className="kanban-settings-page__intro">
-        Personnalisez les couleurs de fond de chaque colonne et les noms en malgache affichés
-        dans le tableau Kanban du FrontOffice.
-      </p>
+      <header className="kanban-settings-page__header">
+        <h1>Paramètres du Kanban</h1>
+        <p className="kanban-settings-page__intro">
+          Personnalisez les couleurs de fond de chaque colonne et les noms en malgache affichés
+          dans le tableau Kanban du FrontOffice.
+        </p>
+      </header>
 
       {loadError && (
         <p className="kanban-settings-page__error">
@@ -201,9 +204,11 @@ function BackofficeKanbanSettingsPage({ onLock }) {
           <p className="kanban-settings-page__error">L'enregistrement a échoué. Réessayez.</p>
         )}
 
-        <button type="submit" disabled={saving} className="kanban-settings-page__submit">
-          {saving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        <div className="kanban-settings-page__form-footer">
+          <button type="submit" disabled={saving} className="kanban-settings-page__submit">
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
       </form>
 
       {/* ── Historique des modifications ─────────────────────────────────────── */}

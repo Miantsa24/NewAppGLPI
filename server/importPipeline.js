@@ -37,23 +37,81 @@ const FORMAT_BY_EXTENSION = {
 // (définis par des constantes PHP comme Ticket::INCIDENT_TYPE = 1). On a vérifié
 // ces valeurs en créant un ticket de test et en relisant ses champs.
 const TICKET_TYPES = { Incident: 1, Demande: 2, Request: 2 }
+// Le projet n'utilise que 3 statuts de ticket : Nouveau (1), En cours/attribué (2)
+// et Clos (6) — toute valeur CSV correspondant à un statut intermédiaire
+// (Planned, Pending) est ramenée à "En cours", et tout statut de fin
+// (Solved, Resolved) est ramené à "Clos".
 const TICKET_STATUSES = {
-  New: 1, Processing: 2, 'In Progress': 2, Planned: 3,
-  Pending: 4, Solved: 5, Resolved: 5, Closed: 6
+  New: 1,
+  Processing: 2, 'In Progress': 2, 'In Progress (Assigned)': 2, Assigned: 2,
+  Planned: 2, Pending: 2,
+  Closed: 6, Solved: 6, Resolved: 6
 }
 const TICKET_PRIORITIES = {
   'Very low': 1, Low: 2, Medium: 3, High: 4, 'Very high': 5, Major: 6, Critical: 6
 }
 
-// "DD/MM/YYYY" + "HH:MM" → "YYYY-MM-DD HH:MM:SS" (format datetime attendu par GLPI)
-function toGlpiDateTime(dateStr, timeStr) {
-  const [day, month, year] = dateStr.split('/')
-  return `${year}-${month}-${day} ${timeStr}:00`
+// ── Lecture insensible à la casse (en-têtes ET valeurs CSV) ────────────────────
+// Le modèle de fichier "Feuille 2" utilisé pour les tickets contient des
+// en-têtes à la casse incohérente (ex. "STATuS" au lieu de "Status", "PRIORITY"
+// au lieu de "Priority") et des valeurs dont la casse varie aussi (ex.
+// "In Progress (assigned)" au lieu de "In Progress (Assigned)"). Sans ces
+// fonctions, "row.Status" / "row.Priority" valent undefined ou ne correspondent
+// à aucune clé de TICKET_STATUSES/TICKET_PRIORITIES — la valeur par défaut
+// (Nouveau / Moyenne) est alors silencieusement appliquée à TOUTES les lignes.
+function getColumn(row, name) {
+  const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase())
+  return key === undefined ? undefined : row[key]
 }
 
-// "8,7" (virgule décimale française) → 8.7 (nombre JS, attendu par GLPI en JSON)
+function lookupCaseInsensitive(map, value) {
+  if (value == null) return undefined
+  const normalized = String(value).trim().toLowerCase()
+  const key = Object.keys(map).find(k => k.toLowerCase() === normalized)
+  return key === undefined ? undefined : map[key]
+}
+
+// "DD/MM/YYYY" + "HH:MM" → "YYYY-MM-DD HH:MM:SS" (format datetime attendu par GLPI)
+// Retourne null si la date est absente ou mal formée — à l'appelant de décider
+// d'une valeur par défaut plutôt que de faire planter tout l'import sur une ligne.
+function toGlpiDateTime(dateStr, timeStr) {
+  const dateMatch = String(dateStr ?? '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!dateMatch) return null
+  const [, day, month, year] = dateMatch
+
+  const timeMatch = String(timeStr ?? '').match(/^(\d{1,2}):(\d{2})$/)
+  const time = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}:00` : '00:00:00'
+
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${time}`
+}
+
+// "8,7" (virgule décimale française) → 8.7 (nombre JS, attendu par GLPI en JSON).
+// Une cellule vide (ex. "Fixed_Cost" non renseigné) donne NaN, que JSON.stringify
+// transforme en "null" — GLPI attend un nombre pour ce champ décimal, donc on
+// ramène ce cas à 0 plutôt que d'envoyer null.
 function parseFrenchNumber(value) {
-  return parseFloat(String(value).replace(',', '.'))
+  const parsed = parseFloat(String(value ?? '').replace(',', '.'))
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+// ── Validation des colonnes requises ───────────────────────────────────────────
+// Vérifie que la première ligne du CSV contient bien toutes les colonnes
+// indispensables au traitement de la feuille — sans elles, mieux vaut ignorer
+// proprement toute la feuille (avec un message clair) que planter sur chaque
+// ligne avec des erreurs "undefined" difficiles à comprendre.
+function hasRequiredColumns(rows, requiredColumns, sheetLabel, log) {
+  if (rows.length === 0) return true
+
+  // Comparaison insensible à la casse — voir getColumn/lookupCaseInsensitive
+  // ci-dessus : les modèles de fichiers utilisent une casse incohérente pour
+  // les en-têtes (ex. "DURATION_second" au lieu de "Duration_second").
+  const actualColumns = new Set(Object.keys(rows[0]).map(k => k.toLowerCase()))
+  const missing = requiredColumns.filter(col => !actualColumns.has(col.toLowerCase()))
+  if (missing.length > 0) {
+    log.push(`${sheetLabel} ignorée : colonne(s) requise(s) manquante(s) : ${missing.join(', ')}.`)
+    return false
+  }
+  return true
 }
 
 // ── Journalisation ─────────────────────────────────────────────────────────────
@@ -74,22 +132,35 @@ function journalize(ctx, itemtype, id, label) {
 // "ctx.cache" : Map(itemtype → Map(nom → id)), construite UNE fois par type en
 // listant tous les items existants — pour éviter de refaire un GET à chaque ligne
 // du CSV (les CSV ne contiennent que des dizaines de lignes : un seul GET suffit).
+//
+// Retourne l'id existant pour ce nom, ou undefined si aucun item de ce type ne
+// porte ce nom. Si l'itemtype n'est pas listable en v1 (ex. "Socket"), le cache
+// est rempli avec une Map vide — donc systématiquement undefined pour ce type
+// (ces items, créés via le repli v2, ne sont pas déduplicables ici).
+async function existingIdByName(ctx, itemtype, name) {
+  if (!ctx.cache.has(itemtype)) {
+    try {
+      const existingItems = await glpi.listItems(ctx.sessionToken, itemtype)
+      ctx.cache.set(itemtype, new Map(existingItems.map(item => [item.name, item.id])))
+    } catch (err) {
+      if (!glpiV2.isUnsupportedInV1(err)) throw err
+      ctx.cache.set(itemtype, new Map())
+    }
+  }
+  return ctx.cache.get(itemtype).get(name)
+}
+
 async function findOrCreate(ctx, itemtype, name, extraFields = {}) {
   // GLPI représente "aucune référence" par l'id 0, PAS par NULL : ses colonnes
   // *_id sont déclarées NOT NULL avec 0 comme valeur par défaut. Une valeur CSV
   // vide (ex. la colonne "User" de PC-FORM-001) doit donc résoudre vers 0.
   if (!name) return 0
 
-  if (!ctx.cache.has(itemtype)) {
-    const existingItems = await glpi.listItems(ctx.sessionToken, itemtype)
-    ctx.cache.set(itemtype, new Map(existingItems.map(item => [item.name, item.id])))
-  }
-  const byName = ctx.cache.get(itemtype)
-
-  if (byName.has(name)) return byName.get(name)
+  const existingId = await existingIdByName(ctx, itemtype, name)
+  if (existingId !== undefined) return existingId
 
   const id = await glpi.createItem(ctx.sessionToken, itemtype, { name, ...extraFields })
-  byName.set(name, id)
+  ctx.cache.get(itemtype).set(name, id)
   journalize(ctx, itemtype, id, name)
   return id
 }
@@ -100,6 +171,7 @@ async function findOrCreate(ctx, itemtype, name, extraFields = {}) {
 // les quelques types ayant une page dédiée dans l'UI.
 async function importAssets(ctx, csvText, log) {
   const rows = parse(csvText, { columns: true, skip_empty_lines: true })
+  if (!hasRequiredColumns(rows, ['Item_Type', 'Name'], 'Feuille 1 (éléments)', log)) return
 
   for (const row of rows) {
     const itemtype = row.Item_Type
@@ -107,74 +179,95 @@ async function importAssets(ctx, csvText, log) {
       log.push(`Ligne ignorée : colonne "Item_Type" vide (élément "${row.Name}").`)
       continue
     }
-
-    // Quatre données de référence à résoudre AVANT de pouvoir créer l'élément
-    // (l'élément a besoin de leurs id, donc elles doivent exister en premier).
-    const locationId     = await findOrCreate(ctx, 'Location', row.Location)
-    const manufacturerId = await findOrCreate(ctx, 'Manufacturer', row.Manufacturer)
-    const stateId        = await findOrCreate(ctx, 'State', row.Status)
-    const userId         = await findOrCreate(ctx, 'User', row.User)
-
-    const fields = {
-      name:             row.Name,
-      locations_id:     locationId,
-      manufacturers_id: manufacturerId,
-      states_id:        stateId,
-      users_id:         userId,
-      serial:           row.Inventory_Number
+    if (!row.Name) {
+      log.push(`Ligne ignorée : colonne "Name" vide (type "${itemtype}").`)
+      continue
     }
 
-    // La plupart des types GLPI suivent la convention "<Type>Model" /
-    // "<type>models_id" (ComputerModel/computermodels_id, PhoneModel/
-    // phonemodels_id...), mais certains types n'ont PAS de table de modèles
-    // (ex. Software). Si la résolution échoue, on crée l'élément sans modèle
-    // plutôt que d'abandonner toute la ligne.
-    if (row.Model) {
-      const modelType  = `${itemtype}Model`
-      const modelField = `${itemtype.toLowerCase()}models_id`
-      try {
-        fields[modelField] = await findOrCreate(ctx, modelType, row.Model)
-      } catch {
-        log.push(`Modèle "${row.Model}" ignoré pour "${row.Name}" : "${modelType}" n'existe pas dans GLPI.`)
-      }
-    }
-
-    let itemId
-    let viaV2 = false
+    // Toute la ligne est protégée : une erreur inattendue (ex. résolution d'une
+    // donnée de référence) ne doit faire échouer QUE cet élément, pas tout l'import.
     try {
-      itemId = await glpi.createItem(ctx.sessionToken, itemtype, fields)
-    } catch (err) {
-      if (!glpiV2.isUnsupportedInV1(err)) {
-        const detail = err.response?.data?.[1] ?? err.message
-        log.push(`Élément "${row.Name}" (${itemtype}) ignoré : ${detail}`)
+      // Doublon : un élément de ce type et ce nom existe déjà dans GLPI — on ne
+      // le recrée pas, mais on le mémorise quand même pour les étapes suivantes
+      // (images, tickets), qui référencent les éléments PAR NOM.
+      const existingId = await existingIdByName(ctx, itemtype, row.Name)
+      if (existingId !== undefined) {
+        ctx.assetsByName.set(row.Name, { itemtype, id: existingId, viaV2: false })
+        log.push(`${itemtype} "${row.Name}" déjà existant (id ${existingId}) — création ignorée.`)
         continue
       }
 
-      // Repli v2 : itemtype absent de la v1 (ex. "Socket"), exposé en v2 sous
-      // "/Assets/<Type>" — format de champs différent (objets imbriqués { id }
-      // plutôt que des clés plates "*_id"). Seuls "name" et "location" ont un
-      // équivalent direct dans le schéma v2 de ces types.
+      // Quatre données de référence à résoudre AVANT de pouvoir créer l'élément
+      // (l'élément a besoin de leurs id, donc elles doivent exister en premier).
+      const locationId     = await findOrCreate(ctx, 'Location', row.Location)
+      const manufacturerId = await findOrCreate(ctx, 'Manufacturer', row.Manufacturer)
+      const stateId        = await findOrCreate(ctx, 'State', row.Status)
+      const userId         = await findOrCreate(ctx, 'User', row.User)
+
+      const fields = {
+        name:             row.Name,
+        locations_id:     locationId,
+        manufacturers_id: manufacturerId,
+        states_id:        stateId,
+        users_id:         userId,
+        serial:           row.Inventory_Number
+      }
+
+      // La plupart des types GLPI suivent la convention "<Type>Model" /
+      // "<type>models_id" (ComputerModel/computermodels_id, PhoneModel/
+      // phonemodels_id...), mais certains types n'ont PAS de table de modèles
+      // (ex. Software). Si la résolution échoue, on crée l'élément sans modèle
+      // plutôt que d'abandonner toute la ligne.
+      if (row.Model) {
+        const modelType  = `${itemtype}Model`
+        const modelField = `${itemtype.toLowerCase()}models_id`
+        try {
+          fields[modelField] = await findOrCreate(ctx, modelType, row.Model)
+        } catch {
+          log.push(`Modèle "${row.Model}" ignoré pour "${row.Name}" : "${modelType}" n'existe pas dans GLPI.`)
+        }
+      }
+
+      let itemId
+      let viaV2 = false
       try {
-        const v2Fields = { name: fields.name }
-        if (locationId) v2Fields.location = { id: locationId }
-        itemId = await glpiV2.createItem(itemtype, v2Fields)
-        viaV2 = true
-        log.push(`${itemtype} "${row.Name}" créé via l'API v2 (id ${itemId}).`)
-      } catch (err2) {
-        const detail = err2.response?.data?.title ?? err2.message
-        log.push(`Élément "${row.Name}" (${itemtype}) ignoré : ${detail}`)
-        continue
-      }
-    }
-    journalize(ctx, itemtype, itemId, row.Name)
+        itemId = await glpi.createItem(ctx.sessionToken, itemtype, fields)
+      } catch (err) {
+        if (!glpiV2.isUnsupportedInV1(err)) {
+          const detail = err.response?.data?.[1] ?? err.message
+          log.push(`Élément "${row.Name}" (${itemtype}) ignoré : ${detail}`)
+          continue
+        }
 
-    // Mémorisé pour les étapes suivantes : association des images (étape 2) et
-    // des tickets (étape 3) — toutes deux référencent les éléments PAR NOM.
-    // "viaV2" : itemtype absent de la v1 (ex. "Socket") — voir importTickets,
-    // qui doit éviter de créer un Item_Ticket vers un tel élément (la v1
-    // plante avec une erreur 500 non gérée plutôt qu'un refus propre).
-    ctx.assetsByName.set(row.Name, { itemtype, id: itemId, viaV2 })
-    log.push(`${itemtype} "${row.Name}" créé (id ${itemId})`)
+        // Repli v2 : itemtype absent de la v1 (ex. "Socket"), exposé en v2 sous
+        // "/Assets/<Type>" — format de champs différent (objets imbriqués { id }
+        // plutôt que des clés plates "*_id"). Seuls "name" et "location" ont un
+        // équivalent direct dans le schéma v2 de ces types.
+        try {
+          const v2Fields = { name: fields.name }
+          if (locationId) v2Fields.location = { id: locationId }
+          itemId = await glpiV2.createItem(itemtype, v2Fields)
+          viaV2 = true
+          log.push(`${itemtype} "${row.Name}" créé via l'API v2 (id ${itemId}).`)
+        } catch (err2) {
+          const detail = err2.response?.data?.title ?? err2.message
+          log.push(`Élément "${row.Name}" (${itemtype}) ignoré : ${detail}`)
+          continue
+        }
+      }
+      journalize(ctx, itemtype, itemId, row.Name)
+
+      // Mémorisé pour les étapes suivantes : association des images (étape 2) et
+      // des tickets (étape 3) — toutes deux référencent les éléments PAR NOM.
+      // "viaV2" : itemtype absent de la v1 (ex. "Socket") — voir importTickets,
+      // qui doit éviter de créer un Item_Ticket vers un tel élément (la v1
+      // plante avec une erreur 500 non gérée plutôt qu'un refus propre).
+      ctx.assetsByName.set(row.Name, { itemtype, id: itemId, viaV2 })
+      log.push(`${itemtype} "${row.Name}" créé (id ${itemId})`)
+    } catch (err) {
+      const detail = err.response?.data?.[1] ?? err.message
+      log.push(`Élément "${row.Name}" (${itemtype}) ignoré : ${detail}`)
+    }
   }
 }
 
@@ -263,52 +356,89 @@ async function importTickets(ctx, csvText, log) {
   }
 
   const rows = parse(csvText, { columns: true, skip_empty_lines: true })
+  if (!hasRequiredColumns(rows, ['Titre', 'Ref_Ticket'], 'Feuille 2 (tickets)', log)) return
+
+  // "ctx.ticketCache" : Map(nom du ticket → id), construite UNE fois en listant
+  // les tickets existants — sert à détecter les doublons sur un ré-import.
+  if (!ctx.ticketCache) {
+    const existingTickets = await glpi.listItems(ctx.sessionToken, 'Ticket')
+    ctx.ticketCache = new Map(existingTickets.map(t => [t.name, t.id]))
+  }
 
   for (const row of rows) {
-    const ticketId = await glpi.createItem(ctx.sessionToken, 'Ticket', {
-      name:     row.Titre,
-      content:  row.Description,
-      type:     TICKET_TYPES[row.Type]         ?? 1,  // valeur par défaut : Incident
-      status:   TICKET_STATUSES[row.Status]    ?? 1,  // valeur par défaut : Nouveau
-      priority: TICKET_PRIORITIES[row.Priority] ?? 3, // valeur par défaut : Moyenne
-      date:     toGlpiDateTime(row.Date, row.Heure)
-    })
-    journalize(ctx, 'Ticket', ticketId, row.Titre)
-    ctx.ticketsByRef.set(row.Ref_Ticket, ticketId)
-    log.push(`Ticket "${row.Titre}" créé (id ${ticketId})`)
+    try {
+      // Doublon : un ticket portant ce titre existe déjà — on ne le recrée pas,
+      // mais on garde quand même la référence pour la feuille 3 (coûts).
+      if (ctx.ticketCache.has(row.Titre)) {
+        const existingId = ctx.ticketCache.get(row.Titre)
+        ctx.ticketsByRef.set(row.Ref_Ticket, existingId)
+        log.push(`Ticket "${row.Titre}" déjà existant (id ${existingId}) — création ignorée.`)
+        continue
+      }
 
-    // La colonne "Items" est une chaîne JSON, ex. : ["PC-ADM-001","MN-FORM-002"]
-    // → on la décode, puis on relie chaque élément trouvé via Item_Ticket
-    //   (table de liaison : exactement le même principe que Document_Item).
-    const itemNames = JSON.parse(row.Items)
-    for (const name of itemNames) {
-      const asset = ctx.assetsByName.get(name)
-      if (!asset) {
-        log.push(`Association ignorée : aucun élément nommé "${name}" (ticket "${row.Titre}")`)
-        continue
+      const fields = {
+        name:     row.Titre,
+        content:  row.Description,
+        type:     TICKET_TYPES[row.Type] ?? 1,                                    // valeur par défaut : Incident
+        status:   lookupCaseInsensitive(TICKET_STATUSES, getColumn(row, 'Status')) ?? 1,  // valeur par défaut : Nouveau
+        priority: lookupCaseInsensitive(TICKET_PRIORITIES, getColumn(row, 'Priority')) ?? 3  // valeur par défaut : Moyenne
       }
-      if (asset.viaV2) {
-        // L'API v1 ne reconnaît pas cet itemtype (ex. "Socket") : Item_Ticket
-        // (CommonItilObject_Item::prepareInputForAdd) plante avec une erreur 500
-        // au lieu d'un refus propre dans ce cas — on évite l'appel.
-        log.push(`Association ignorée : "${name}" (${asset.itemtype}) n'est pas liable à un ticket via l'API v1 (ticket "${row.Titre}")`)
-        continue
+
+      const glpiDate = toGlpiDateTime(row.Date, row.Heure)
+      if (glpiDate) {
+        fields.date = glpiDate
+      } else {
+        log.push(`Ticket "${row.Titre}" : date "${row.Date ?? ''} ${row.Heure ?? ''}" invalide ou absente — date de création par défaut utilisée.`)
       }
-      // GLPI refuse via l'API la création d'un Item_Ticket sur un ticket "Closed"
-      // (droits insuffisants, cf. CommonItilObject_Item::canCreateItem) — sans ce
-      // try/catch, une seule association refusée faisait échouer TOUT l'import
-      // (et les 99 tickets suivants n'étaient jamais créés).
+
+      const ticketId = await glpi.createItem(ctx.sessionToken, 'Ticket', fields)
+      journalize(ctx, 'Ticket', ticketId, row.Titre)
+      ctx.ticketCache.set(row.Titre, ticketId)
+      ctx.ticketsByRef.set(row.Ref_Ticket, ticketId)
+      log.push(`Ticket "${row.Titre}" créé (id ${ticketId})`)
+
+      // La colonne "Items" est une chaîne JSON, ex. : ["PC-ADM-001","MN-FORM-002"]
+      // → on la décode, puis on relie chaque élément trouvé via Item_Ticket
+      //   (table de liaison : exactement le même principe que Document_Item).
+      let itemNames = []
       try {
-        const linkId = await glpi.createItem(ctx.sessionToken, 'Item_Ticket', {
-          tickets_id: ticketId,
-          itemtype:   asset.itemtype,
-          items_id:   asset.id
-        })
-        journalize(ctx, 'Item_Ticket', linkId, `${name} → ticket "${row.Titre}"`)
-      } catch (err) {
-        const detail = err.response?.data?.[1] ?? err.message
-        log.push(`Association ignorée : "${name}" → ticket "${row.Titre}" : ${detail}`)
+        itemNames = JSON.parse(row.Items)
+      } catch {
+        log.push(`Ticket "${row.Titre}" : colonne "Items" illisible (${row.Items ?? ''}) — aucun élément associé.`)
       }
+
+      for (const name of itemNames) {
+        const asset = ctx.assetsByName.get(name)
+        if (!asset) {
+          log.push(`Association ignorée : aucun élément nommé "${name}" (ticket "${row.Titre}")`)
+          continue
+        }
+        if (asset.viaV2) {
+          // L'API v1 ne reconnaît pas cet itemtype (ex. "Socket") : Item_Ticket
+          // (CommonItilObject_Item::prepareInputForAdd) plante avec une erreur 500
+          // au lieu d'un refus propre dans ce cas — on évite l'appel.
+          log.push(`Association ignorée : "${name}" (${asset.itemtype}) n'est pas liable à un ticket via l'API v1 (ticket "${row.Titre}")`)
+          continue
+        }
+        // GLPI refuse via l'API la création d'un Item_Ticket sur un ticket "Closed"
+        // (droits insuffisants, cf. CommonItilObject_Item::canCreateItem) — sans ce
+        // try/catch, une seule association refusée faisait échouer TOUT l'import
+        // (et les 99 tickets suivants n'étaient jamais créés).
+        try {
+          const linkId = await glpi.createItem(ctx.sessionToken, 'Item_Ticket', {
+            tickets_id: ticketId,
+            itemtype:   asset.itemtype,
+            items_id:   asset.id
+          })
+          journalize(ctx, 'Item_Ticket', linkId, `${name} → ticket "${row.Titre}"`)
+        } catch (err) {
+          const detail = err.response?.data?.[1] ?? err.message
+          log.push(`Association ignorée : "${name}" → ticket "${row.Titre}" : ${detail}`)
+        }
+      }
+    } catch (err) {
+      const detail = err.response?.data?.[1] ?? err.message
+      log.push(`Ticket "${row.Titre}" ignoré : ${detail}`)
     }
   }
 }
@@ -328,23 +458,52 @@ async function importTicketCosts(ctx, csvText, log) {
   }
 
   const rows = parse(csvText, { columns: true, skip_empty_lines: true })
+  if (!hasRequiredColumns(rows, ['Num_Ticket', 'Duration_second', 'Time_Cost', 'Fixed_Cost'], 'Feuille 3 (coûts)', log)) return
 
   for (const row of rows) {
-    const ticketId = ctx.ticketsByRef.get(row.Num_Ticket)
-    if (!ticketId) {
-      log.push(`Coût ignoré : aucun ticket pour la référence "${row.Num_Ticket}"`)
-      continue
-    }
+    try {
+      const ticketId = ctx.ticketsByRef.get(row.Num_Ticket)
+      if (!ticketId) {
+        log.push(`Coût ignoré : aucun ticket pour la référence "${row.Num_Ticket}"`)
+        continue
+      }
 
-    const costId = await glpi.createItem(ctx.sessionToken, 'TicketCost', {
-      tickets_id: ticketId,
-      name:       'Coût importé',
-      actiontime: parseInt(row.Duration_second, 10) || 0,
-      cost_time:  parseFrenchNumber(row.Time_Cost),
-      cost_fixed: parseFrenchNumber(row.Fixed_Cost)
-    })
-    journalize(ctx, 'TicketCost', costId, `Coût du ticket #${row.Num_Ticket}`)
-    log.push(`Coût ajouté au ticket #${row.Num_Ticket} (TicketCost id ${costId})`)
+      const actiontime = parseInt(getColumn(row, 'Duration_second'), 10) || 0
+      const costTime   = parseFrenchNumber(row.Time_Cost)
+      const costFixed  = parseFrenchNumber(row.Fixed_Cost)
+
+      // "ctx.costsCache" : Map(ticketId → coûts existants), construite UNE fois
+      // par ticket en listant ses TicketCost — sert à détecter les doublons
+      // (mêmes temps/coûts) sur un ré-import.
+      if (!ctx.costsCache.has(ticketId)) {
+        const existingCosts = await glpi.listSubItems(ctx.sessionToken, 'Ticket', ticketId, 'TicketCost')
+        ctx.costsCache.set(ticketId, existingCosts)
+      }
+
+      const isDuplicate = ctx.costsCache.get(ticketId).some(cost =>
+        Number(cost.actiontime) === actiontime &&
+        Number(cost.cost_time)  === costTime &&
+        Number(cost.cost_fixed) === costFixed
+      )
+      if (isDuplicate) {
+        log.push(`Coût ignoré : déjà présent pour le ticket #${row.Num_Ticket} (temps ${actiontime}s, coût horaire ${costTime}, coût fixe ${costFixed}).`)
+        continue
+      }
+
+      const costId = await glpi.createItem(ctx.sessionToken, 'TicketCost', {
+        tickets_id: ticketId,
+        name:       'Coût importé',
+        actiontime,
+        cost_time:  costTime,
+        cost_fixed: costFixed
+      })
+      journalize(ctx, 'TicketCost', costId, `Coût du ticket #${row.Num_Ticket}`)
+      ctx.costsCache.get(ticketId).push({ actiontime, cost_time: costTime, cost_fixed: costFixed })
+      log.push(`Coût ajouté au ticket #${row.Num_Ticket} (TicketCost id ${costId})`)
+    } catch (err) {
+      const detail = err.response?.data?.[1] ?? err.message
+      log.push(`Coût ignoré (ticket #${row.Num_Ticket}) : ${detail}`)
+    }
   }
 }
 
@@ -419,6 +578,8 @@ export async function runImport({ feuille1Csv, feuille2Csv, feuille3Csv, zipBuff
     cache:         new Map(),
     assetsByName:  new Map(),
     ticketsByRef:  new Map(),
+    ticketCache:   undefined,
+    costsCache:    new Map(),
     insertJournal: db.prepare('INSERT INTO import_journal (glpi_itemtype, glpi_id, label) VALUES (?, ?, ?)')
   }
 

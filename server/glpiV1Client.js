@@ -171,6 +171,20 @@ export async function uploadDocument(sessionToken, { filePath, fileName }) {
   return response.data.id
 }
 
+// ── Téléchargement du contenu d'un Document ────────────────────────────────────
+// D'après docs/apirest.md de GLPI (section "Get an item") : demander un Document
+// avec l'en-tête "Accept: application/octet-stream" renvoie directement le
+// contenu BINAIRE du fichier (au lieu du JSON de métadonnées habituel).
+// "responseType: arraybuffer" : nécessaire pour qu'axios ne tente pas de décoder
+// la réponse comme du texte/JSON et corrompe les octets de l'image.
+export async function downloadDocument(sessionToken, documentId) {
+  const response = await axios.get(`${V1_URL}/Document/${documentId}`, {
+    headers:      sessionHeaders(sessionToken, { 'Accept': 'application/octet-stream' }),
+    responseType: 'arraybuffer'
+  })
+  return { data: response.data, contentType: response.headers['content-type'] }
+}
+
 // ── Association Document ↔ item (table de liaison Document_Item) ───────────────
 // En GLPI, un Document est une entité indépendante (un "fichier dans le coffre").
 // L'associer à un Computer/Monitor/Ticket... passe par une ligne dans la table

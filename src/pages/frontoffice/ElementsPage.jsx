@@ -127,16 +127,18 @@ function ElementsPage() {
       navLinks={FRONTOFFICE_NAV_LINKS}
     >
     <div className="elements-page">
-      <h1>Éléments</h1>
-      <p className="elements-page__intro">
-        Recherche en direct dans GLPI — utilisez un seul critère ou combinez-les.
-        Les résultats s'affichent automatiquement.
-      </p>
+      <header className="elements-page__header">
+        <h1>Éléments</h1>
+        <p className="elements-page__intro">
+          Recherche en direct dans GLPI — utilisez un seul critère ou combinez-les.
+          Les résultats s'affichent automatiquement.
+        </p>
+      </header>
 
       <form onSubmit={handleSearch} className="elements-page__form">
         <div className="elements-page__type">
-          <label>
-            Type d'élément{' '}
+          <label className="elements-page__criterion">
+            Type d'élément
             <select value={itemtype} onChange={e => setItemtype(e.target.value)}>
               {ASSET_TYPES.map(({ itemtype: type, label }) => (
                 <option key={type} value={type}>{label}</option>
@@ -174,9 +176,11 @@ function ElementsPage() {
           ))}
         </div>
 
-        <button type="submit" disabled={loading} className="elements-page__submit">
-          {loading ? 'Recherche…' : 'Rechercher'}
-        </button>
+        <div className="elements-page__form-footer">
+          <button type="submit" disabled={loading} className="elements-page__submit">
+            {loading ? 'Recherche…' : 'Rechercher'}
+          </button>
+        </div>
       </form>
 
       {error && (
@@ -190,28 +194,30 @@ function ElementsPage() {
       )}
 
       {results && results.length > 0 && (
-        <table className="elements-page__table">
-          <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Statut</th>
-              <th>Emplacement</th>
-              <th>Fabricant</th>
-              <th>N° de série</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map(element => (
-              <tr key={element.id}>
-                <td>{element.name}</td>
-                <td>{cellValue(element.status)}</td>
-                <td>{cellValue(element.location)}</td>
-                <td>{cellValue(element.manufacturer)}</td>
-                <td>{element.serial ?? '—'}</td>
+        <div className="elements-page__results">
+          <table className="elements-page__table">
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th>Statut</th>
+                <th>Emplacement</th>
+                <th>Fabricant</th>
+                <th>N° de série</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {results.map(element => (
+                <tr key={element.id}>
+                  <td>{element.name}</td>
+                  <td>{cellValue(element.status)}</td>
+                  <td>{cellValue(element.location)}</td>
+                  <td>{cellValue(element.manufacturer)}</td>
+                  <td>{element.serial ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
     </Layout>

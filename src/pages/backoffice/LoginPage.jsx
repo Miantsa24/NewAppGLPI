@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { setBackofficeCode } from './api.js'
 import './LoginPage.css'
 
 // onUnlock : fonction fournie par App pour le prévenir que le code est validé
@@ -33,6 +34,7 @@ function BackofficeLoginPage({ onUnlock }) {
         // Logique pour un accès "temporaire" type backoffice — pas besoin de persister
         // indéfiniment comme le token GLPI (qui sert, lui, à des appels API répétés).
         sessionStorage.setItem('backoffice_unlocked', 'true')
+        setBackofficeCode(code)    // mémorisé pour les routes protégées (X-Backoffice-Code)
         onUnlock()                 // prévient App → re-rendu → route backoffice accessible
         navigate('/backoffice')
       } else {
@@ -47,29 +49,31 @@ function BackofficeLoginPage({ onUnlock }) {
 
   return (
     <div className="backoffice-login-page">
-      <h1>Backoffice NewApp</h1>
-      <p className="backoffice-login-page__subtitle">Entrez le code d'accès pour continuer</p>
+      <div className="backoffice-login-page__card">
+        <h1>Backoffice NewApp</h1>
+        <p className="backoffice-login-page__subtitle">Entrez le code d'accès pour continuer</p>
 
-      <form onSubmit={handleSubmit} className="backoffice-login-page__form">
-        <input
-          type="text"
-          placeholder="Code d'accès"
-          value={code}
-          onChange={e => setCode(e.target.value)}
-          required
-          className="backoffice-login-page__input"
-        />
+        <form onSubmit={handleSubmit} className="backoffice-login-page__form">
+          <input
+            type="text"
+            placeholder="Code d'accès"
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            required
+            className="backoffice-login-page__input"
+          />
 
-        {error && <p className="backoffice-login-page__error">{error}</p>}
+          {error && <p className="backoffice-login-page__error">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="backoffice-login-page__submit"
-        >
-          {loading ? 'Vérification...' : 'Accéder au backoffice'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={loading}
+            className="backoffice-login-page__submit"
+          >
+            {loading ? 'Vérification...' : 'Accéder au backoffice'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

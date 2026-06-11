@@ -1,20 +1,33 @@
 .create-element-page {
-  max-width: 700px;
-  margin: 2rem auto;
   font-family: var(--sans);
   text-align: left;
 }
 
+.create-element-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.create-element-page__form {
+  max-width: 700px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+
 .create-element-page__field {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .create-element-page__field label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
   color: var(--text);
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .create-element-page input[type="text"],
@@ -23,6 +36,7 @@
   padding: 0.5rem 0.6rem;
   font-family: inherit;
   font-size: 0.95rem;
+  font-weight: 400;
   color: var(--text-h);
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -37,19 +51,29 @@
   border-color: var(--accent);
 }
 
+.create-element-page input[type="text"]:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.create-element-page textarea {
+  resize: vertical;
+}
+
 .create-element-page__row {
   display: flex;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .create-element-page__row label {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
   color: var(--text);
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .create-element-page__error {
@@ -57,7 +81,7 @@
   color: var(--danger);
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .create-element-page__success {
@@ -65,7 +89,12 @@
   color: var(--success);
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.create-element-page__form-footer {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .create-element-page__submit {
@@ -89,4 +118,66 @@
   background: var(--surface-2);
   color: var(--text-muted);
   cursor: not-allowed;
+}
+
+/* ── Liste des éléments existants ────────────────────────────────────────── */
+.create-element-page__list {
+  margin-top: 2rem;
+}
+
+.create-element-page__list h2 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.create-element-page__empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.create-element-page__results {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  /* "auto" plutôt que "hidden" : la table a 8 colonnes et peut dépasser la
+     largeur de la page sur petit écran — on préfère un défilement horizontal
+     local à la perte de colonnes. */
+  overflow-x: auto;
+}
+
+.create-element-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.create-element-page__table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.create-element-page__table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.create-element-page__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.create-element-page__table tbody tr:hover {
+  background: var(--surface-2);
 }

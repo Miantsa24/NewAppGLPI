@@ -1,42 +1,66 @@
-.dashboard-page {
-  max-width: 900px;
-  font-family: var(--sans);
+.dashboard-page__header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .dashboard-page__intro {
   color: var(--text-muted);
-  margin-bottom: 2rem;
 }
 
 /* Grille de cartes — s'adapte automatiquement à la largeur disponible */
 .dashboard-page__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 1rem;
 }
 
 /* "Link" React Router rendu comme une carte cliquable */
 .dashboard-page__card {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 1rem;
   padding: 1.25rem 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   text-decoration: none;
   color: var(--text);
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .dashboard-page__card:hover {
   background: var(--surface-2);
-  border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.dashboard-page__card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.dashboard-page__card-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.dashboard-page__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .dashboard-page__card-title {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1rem;
   color: var(--text-h);
 }

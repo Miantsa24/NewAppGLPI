@@ -43,16 +43,61 @@ function summarize(item) {
 // shared/assetTypes.js : Computer, Monitor, Phone) — un seul module générique,
 // comme la recherche FrontOffice (ElementsPage) qui traite déjà ces types de
 // façon uniforme.
+//
+// Les cartes du Backoffice affichent Statut/Emplacement/Fabricant/Modèle en plus
+// du nom et du n° d'inventaire (serial) — on résout ces relations en UNE passe
+// par type (Location/State/Manufacturer/<Itemtype>Model), comme le fait déjà
+// la recherche FrontOffice (/api/frontoffice/elements), plutôt qu'un appel par
+// élément (qui serait beaucoup plus lent sur un inventaire complet).
 export async function listElements(itemtype) {
   const sessionToken = await glpi.openSession()
   try {
-    const items = await glpi.listItems(sessionToken, itemtype)
+    const modelType  = `${itemtype}Model`
+    const modelField = `${itemtype.toLowerCase()}models_id`
+
+    const [items, locations, states, manufacturers, models] = await Promise.all([
+      glpi.listItems(sessionToken, itemtype),
+      glpi.listItems(sessionToken, 'Location'),
+      glpi.listItems(sessionToken, 'State'),
+      glpi.listItems(sessionToken, 'Manufacturer'),
+      glpi.listItems(sessionToken, modelType)
+    ])
+
+    const locationById     = new Map(locations.map(x => [x.id, x.name]))
+    const stateById        = new Map(states.map(x => [x.id, x.name]))
+    const manufacturerById = new Map(manufacturers.map(x => [x.id, x.name]))
+    const modelById        = new Map(models.map(x => [x.id, x.name]))
+
     // Tri alphabétique : plus naturel pour parcourir un inventaire qu'un tri
     // par id (qui ne reflète que l'ordre de création).
     return items
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map(summarize)
+      .map(item => ({
+        id:              item.id,
+        name:            item.name,
+        inventoryNumber: item.serial || null,
+        status:          stateById.get(item.states_id)              ?? null,
+        location:        locationById.get(item.locations_id)        ?? null,
+        manufacturer:    manufacturerById.get(item.manufacturers_id) ?? null,
+        model:           modelById.get(item[modelField])             ?? null
+      }))
+  } finally {
+    await glpi.closeSession(sessionToken)
+  }
+}
+
+// ── Image associée à un élément (import ZIP — voir importPipeline.js) ─────────
+// Un élément peut avoir 0 ou plusieurs Document_Item liés ; on affiche le
+// premier (l'import n'en associe qu'un seul par élément, voir importImages).
+// Renvoie null si aucune image n'est associée — la route appelante répond
+// alors 404, et le frontend affiche un visuel de remplacement.
+export async function getElementImage(itemtype, id) {
+  const sessionToken = await glpi.openSession()
+  try {
+    const docLinks = await glpi.listSubItems(sessionToken, itemtype, id, 'Document_Item')
+    if (docLinks.length === 0) return null
+    return await glpi.downloadDocument(sessionToken, docLinks[0].documents_id)
   } finally {
     await glpi.closeSession(sessionToken)
   }
@@ -68,17 +113,22 @@ export async function getElementDetail(itemtype, id) {
   try {
     const item = await glpi.getItem(sessionToken, itemtype, id)
 
-    const [location, manufacturer, status] = await Promise.all([
+    const modelType  = `${itemtype}Model`
+    const modelField = `${itemtype.toLowerCase()}models_id`
+
+    const [location, manufacturer, status, model] = await Promise.all([
       resolveName(sessionToken, 'Location',     item.locations_id),
       resolveName(sessionToken, 'Manufacturer', item.manufacturers_id),
-      resolveName(sessionToken, 'State',        item.states_id)
+      resolveName(sessionToken, 'State',        item.states_id),
+      resolveName(sessionToken, modelType,      item[modelField])
     ])
 
     return {
       ...summarize(item),
       location,
       manufacturer,
-      status
+      status,
+      model
     }
   } finally {
     await glpi.closeSession(sessionToken)

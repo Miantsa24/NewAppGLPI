@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
+import { clearBackofficeSession, backofficeFetch } from './api.js'
 import './ImportPage.css'
 
 function BackofficeImportPage({ onLock }) {
   const navigate = useNavigate()
 
   function lock() {
-    sessionStorage.removeItem('backoffice_unlocked')
+    clearBackofficeSession()
     onLock()
     navigate('/backoffice/login')
   }
@@ -41,7 +42,7 @@ function BackofficeImportPage({ onLock }) {
     setResult(null)
 
     try {
-      const response = await fetch('http://localhost:3001/api/backoffice/import', {
+      const response = await backofficeFetch('http://localhost:3001/api/backoffice/import', {
         method: 'POST',
         body:   formData
       })
@@ -102,36 +103,42 @@ function BackofficeImportPage({ onLock }) {
       onAction={lock}
     >
     <div className="import-page">
-      <h1>Import de données</h1>
-      <p className="import-page__intro">
-        Seule la feuille 1 (« Éléments ») est obligatoire. Les feuilles 2
-        (tickets) et 3 (coûts de tickets), ainsi que le fichier ZIP contenant
-        les images, sont optionnels et peuvent être importés indépendamment.
-        Chaque création dans GLPI est journalisée pour permettre une
-        réinitialisation ultérieure.
-      </p>
+      <header className="import-page__header">
+        <h1>Import de données</h1>
+        <p className="import-page__intro">
+          Seule la feuille 1 (« Éléments ») est obligatoire. Les feuilles 2
+          (tickets) et 3 (coûts de tickets), ainsi que le fichier ZIP contenant
+          les images, sont optionnels et peuvent être importés indépendamment.
+          Chaque création dans GLPI est journalisée pour permettre une
+          réinitialisation ultérieure.
+        </p>
+      </header>
 
       <form onSubmit={handleSubmit} className="import-page__form">
-        <label>
-          Feuille 1 — Éléments (CSV)
-          <input type="file" accept=".csv" onChange={e => setFeuille1(e.target.files[0])} />
-        </label>
-        <label>
-          Feuille 2 — Tickets (CSV) — optionnel
-          <input type="file" accept=".csv" onChange={e => setFeuille2(e.target.files[0])} />
-        </label>
-        <label>
-          Feuille 3 — Coûts de tickets (CSV) — optionnel
-          <input type="file" accept=".csv" onChange={e => setFeuille3(e.target.files[0])} />
-        </label>
-        <label>
-          Images (ZIP) — optionnel
-          <input type="file" accept=".zip" onChange={e => setImages(e.target.files[0])} />
-        </label>
+        <div className="import-page__fields">
+          <label>
+            Feuille 1 — Éléments (CSV)
+            <input type="file" accept=".csv" onChange={e => setFeuille1(e.target.files[0])} />
+          </label>
+          <label>
+            Feuille 2 — Tickets (CSV) — optionnel
+            <input type="file" accept=".csv" onChange={e => setFeuille2(e.target.files[0])} />
+          </label>
+          <label>
+            Feuille 3 — Coûts de tickets (CSV) — optionnel
+            <input type="file" accept=".csv" onChange={e => setFeuille3(e.target.files[0])} />
+          </label>
+          <label>
+            Images (ZIP) — optionnel
+            <input type="file" accept=".zip" onChange={e => setImages(e.target.files[0])} />
+          </label>
+        </div>
 
-        <button type="submit" disabled={!canSubmit} className="import-page__submit">
-          {loading ? 'Import en cours…' : 'Lancer l\'import'}
-        </button>
+        <div className="import-page__form-footer">
+          <button type="submit" disabled={!canSubmit} className="import-page__submit">
+            {loading ? 'Import en cours…' : 'Lancer l\'import'}
+          </button>
+        </div>
       </form>
 
       {/* Barre de progression : indéterminée tant que le premier événement SSE

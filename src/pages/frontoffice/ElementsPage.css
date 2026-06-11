@@ -1,50 +1,50 @@
 .elements-page {
-  max-width: 900px;
-  margin: 2rem auto;
   font-family: var(--sans);
   text-align: left;
+}
+
+.elements-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .elements-page__intro {
   color: var(--text-muted);
 }
 
+/* ── Formulaire de recherche ──────────────────────────────────────────────── */
 .elements-page__form {
   background: var(--surface);
   border: 1px solid var(--border);
-  padding: 1rem;
-  border-radius: 8px;
-  margin-top: 1rem;
+  border-radius: 10px;
+  padding: 1.5rem;
 }
 
 .elements-page__type {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.elements-page__type select {
-  padding: 0.4rem 0.6rem;
-  font-family: inherit;
-  font-size: 0.95rem;
-  color: var(--text-h);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+.elements-page__type .elements-page__criterion {
+  max-width: 260px;
 }
 
 .elements-page__criteria {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .elements-page__criterion {
   display: flex;
   flex-direction: column;
-  min-width: 180px;
-  gap: 0.35rem;
+  gap: 0.4rem;
   color: var(--text);
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 /* Styles partagés : input texte ET select ont la même apparence */
@@ -53,6 +53,7 @@
   padding: 0.5rem 0.6rem;
   font-family: inherit;
   font-size: 0.95rem;
+  font-weight: 400;
   color: var(--text-h);
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -75,8 +76,13 @@
   cursor: not-allowed;
 }
 
+.elements-page__form-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .elements-page__submit {
-  padding: 0.5rem 1rem;
+  padding: 0.55rem 1.25rem;
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 500;
@@ -98,37 +104,62 @@
   cursor: not-allowed;
 }
 
+/* ── États : erreur / vide ────────────────────────────────────────────────── */
 .elements-page__error {
   background: var(--danger-bg);
   color: var(--danger);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
-  margin-top: 1rem;
+  border-radius: 8px;
+  margin-top: 1.5rem;
 }
 
 .elements-page__empty {
-  margin-top: 1rem;
+  margin-top: 1.5rem;
+  padding: 2rem;
+  text-align: center;
   color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* ── Résultats ────────────────────────────────────────────────────────────── */
+.elements-page__results {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .elements-page__table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1rem;
 }
 
 .elements-page__table th {
   text-align: left;
-  padding: 0.5rem;
-  border-bottom: 2px solid var(--border);
-  color: var(--text-h);
-}
-
-.elements-page__table td {
-  padding: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--surface-2);
   border-bottom: 1px solid var(--border);
 }
 
+.elements-page__table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.elements-page__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .elements-page__table tbody tr:hover {
-  background: var(--surface);
+  background: var(--surface-2);
 }

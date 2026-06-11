@@ -108,9 +108,14 @@ function CreateTicketPage() {
       navLinks={FRONTOFFICE_NAV_LINKS}
     >
     <div className="create-ticket-page">
-      <h1>Créer un ticket</h1>
+      <header className="create-ticket-page__header">
+        <h1>Créer un ticket</h1>
+        <p className="create-ticket-page__intro">
+          Décrivez votre incident ou votre demande, puis associez les éléments concernés si besoin.
+        </p>
+      </header>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="create-ticket-page__form">
         <div className="create-ticket-page__field">
           <label>
             Titre
@@ -127,13 +132,13 @@ function CreateTicketPage() {
 
         <div className="create-ticket-page__row">
           <label>
-            Type {' '}
+            Type
             <select value={type} onChange={e => setType(Number(e.target.value))}>
               {TICKET_TYPES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
           <label>
-            Urgence {' '}
+            Urgence
             <select value={urgency} onChange={e => setUrgency(Number(e.target.value))}>
               {URGENCY_LEVELS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
             </select>
@@ -199,9 +204,11 @@ function CreateTicketPage() {
           <p className="create-ticket-page__error">{submitError}</p>
         )}
 
-        <button type="submit" disabled={submitting} className="create-ticket-page__submit">
-          {submitting ? 'Création…' : 'Créer le ticket'}
-        </button>
+        <div className="create-ticket-page__form-footer">
+          <button type="submit" disabled={submitting} className="create-ticket-page__submit">
+            {submitting ? 'Création…' : 'Créer le ticket'}
+          </button>
+        </div>
       </form>
     </div>
     </Layout>

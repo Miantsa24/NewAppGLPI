@@ -74,3 +74,84 @@ Bouton « Ajouter 1 ticket » (bas de la colonne Nouveau) → modale de créatio
 Page Backoffice dédiée : 3 color pickers (couleurs de fond) + 3 champs texte (noms Malgaches)
 Persistance dans SQLite via PUT /api/backoffice/kanban/settings
 Lecture partagée via GET /api/kanban/settings (accessible aussi par le FrontOffice)
+
+
+## Structure du projet
+NEWAPPGLPI/
+│
+├── data/
+├── dist/
+├── docs/
+├── node_modules/
+├── public/
+├── server/
+├── shared/
+│
+├── src/
+│   │
+│   ├── api/
+│   ├── assets/
+│   │
+│   ├── components/
+│   │   ├── Layout.css
+│   │   └── Layout.jsx
+│   │
+│   ├── pages/
+│   │   │
+│   │   ├── backoffice/
+│   │   │   ├── AddCostPage.css
+│   │   │   ├── AddCostPage.jsx
+│   │   │   ├── DashboardPage.css
+│   │   │   ├── DashboardPage.jsx
+│   │   │   ├── ElementDetailPage.css
+│   │   │   ├── ElementDetailPage.jsx
+│   │   │   ├── ElementsPage.css
+│   │   │   ├── ElementsPage.jsx
+│   │   │   ├── HomePage.css
+│   │   │   ├── HomePage.jsx
+│   │   │   ├── ImportPage.css
+│   │   │   ├── ImportPage.jsx
+│   │   │   ├── KanbanSettingsPage.css
+│   │   │   ├── KanbanSettingsPage.jsx
+│   │   │   ├── LoginPage.css
+│   │   │   ├── LoginPage.jsx
+│   │   │   ├── navLinks.js
+│   │   │   ├── ResetPage.css
+│   │   │   ├── ResetPage.jsx
+│   │   │   ├── TicketDetailPage.css
+│   │   │   ├── TicketDetailPage.jsx
+│   │   │   ├── TicketsPage.css
+│   │   │   └── TicketsPage.jsx
+│   │   │
+│   │   ├── frontoffice/
+│   │   │   ├── CreateElementPage.css
+│   │   │   ├── CreateElementPage.jsx
+│   │   │   ├── CreateTicketPage.css
+│   │   │   ├── CreateTicketPage.jsx
+│   │   │   ├── DashboardPage.css
+│   │   │   ├── DashboardPage.jsx
+│   │   │   ├── ElementsPage.css
+│   │   │   ├── ElementsPage.jsx
+│   │   │   ├── KanbanPage.css
+│   │   │   ├── KanbanPage.jsx
+│   │   │   ├── LoginPage.css
+│   │   │   ├── LoginPage.jsx
+│   │   │   └── navLinks.js
+│   │   │
+│   │   ├── CallbackPage.jsx
+│   │   └── Home.jsx
+│   │
+│   ├── App.css
+│   ├── App.jsx
+│   ├── index.css
+│   └── main.jsx
+│
+├── .env
+├── .gitattributes
+├── .gitignore
+├── eslint.config.js
+├── index.html
+├── package-lock.json
+├── package.json
+├── README.md
+└── vite.config.js

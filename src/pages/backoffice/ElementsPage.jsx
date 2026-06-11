@@ -2,7 +2,18 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
+import { clearBackofficeSession } from './api.js'
+import { ASSET_TYPES } from '../../../shared/assetTypes.js'
 import './ElementsPage.css'
+
+// "Item_Type" (colonne du CSV d'import, voir importPipeline.js) — la page ne
+// liste qu'un seul itemtype à la fois, donc cette valeur est identique pour
+// toutes les cartes. On la dérive de ASSET_TYPES (ex. "un ordinateur" → "Ordinateur").
+function itemTypeLabel(itemtype) {
+  const entry = ASSET_TYPES.find(t => t.itemtype === itemtype)
+  if (!entry) return itemtype
+  return entry.singular.replace(/^(un|une)\s+/, '').replace(/^./, c => c.toUpperCase())
+}
 
 // onLock : même rôle que dans BackofficeTicketsPage — prévenir App que l'accès
 // backoffice doit être reverrouillé.
@@ -14,7 +25,7 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
   const navigate = useNavigate()
 
   function lock() {
-    sessionStorage.removeItem('backoffice_unlocked')
+    clearBackofficeSession()
     onLock()
     navigate('/backoffice/login')
   }
@@ -65,8 +76,10 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
       onAction={lock}
     >
       <div className="backoffice-elements-page">
-        <h1>{pageTitle}</h1>
-        <p className="backoffice-elements-page__intro">{intro}</p>
+        <header className="backoffice-elements-page__header">
+          <h1>{pageTitle}</h1>
+          <p className="backoffice-elements-page__intro">{intro}</p>
+        </header>
 
         {loading && <p>Chargement…</p>}
 
@@ -76,31 +89,59 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
           </p>
         )}
 
-        {elements && elements.length === 0 && <p>Aucun élément pour le moment.</p>}
+        {elements && elements.length === 0 && (
+          <p className="backoffice-elements-page__empty">Aucun élément pour le moment.</p>
+        )}
 
         {elements && elements.length > 0 && (
-          <table className="backoffice-elements-page__table">
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>N° de série</th>
-                <th>Autre n° de série</th>
-                <th>Commentaire</th>
-              </tr>
-            </thead>
-            <tbody>
-              {elements.map(element => (
-                <tr key={element.id}>
-                  <td>
-                    <Link to={`/backoffice/elements/${itemtype}/${element.id}`}>{element.name}</Link>
-                  </td>
-                  <td>{element.serial ?? '—'}</td>
-                  <td>{element.otherserial ?? '—'}</td>
-                  <td>{element.comment ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="backoffice-elements-page__cards">
+            {elements.map(element => (
+              <Link
+                key={element.id}
+                to={`/backoffice/elements/${itemtype}/${element.id}`}
+                className="element-card"
+              >
+                <div className="element-card__image">
+                  <img
+                    src={`http://localhost:3001/api/backoffice/elements/${itemtype}/${element.id}/image`}
+                    alt=""
+                    loading="lazy"
+                    onError={e => { e.currentTarget.style.display = 'none' }}
+                  />
+                  <span className="element-card__placeholder" aria-hidden="true">{itemtype[0]}</span>
+                </div>
+                <div className="element-card__body">
+                  <h3 className="element-card__name">{element.name}</h3>
+                  <dl className="element-card__details">
+                    <div>
+                      <dt>Statut</dt>
+                      <dd>{element.status ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Emplacement</dt>
+                      <dd>{element.location ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Fabricant</dt>
+                      <dd>{element.manufacturer ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Type</dt>
+                      <dd>{itemTypeLabel(itemtype)}</dd>
+                    </div>
+                    <div>
+                      <dt>Modèle</dt>
+                      <dd>{element.model ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>N° d'inventaire</dt>
+                      <dd>{element.inventoryNumber ?? '—'}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </Layout>

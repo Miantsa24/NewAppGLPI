@@ -13,6 +13,10 @@
   padding: 0.85rem 1.5rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: var(--shadow);
 }
 
 .app-layout__brand {
@@ -74,6 +78,7 @@
   background: var(--accent-bg);
   color: var(--accent);
   font-weight: 500;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 /* ── Groupe de liens (catégorie, liste déroulante) ────────────────────────── */
@@ -121,6 +126,7 @@
 
 .app-layout__content {
   flex: 1;
+  min-width: 0;
   padding: 2rem;
   overflow-x: auto;
 }

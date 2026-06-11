@@ -1,8 +1,22 @@
 .backoffice-login-page {
+  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  margin-top: 6rem;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.backoffice-login-page__card {
+  width: 100%;
+  max-width: 360px;
+  padding: 2.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  text-align: center;
 }
 
 .backoffice-login-page__subtitle {
@@ -14,7 +28,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  width: 280px;
   margin-top: 2rem;
 }
 
@@ -25,7 +38,7 @@
   text-align: center;
   letter-spacing: 0.1em;
   color: var(--text-h);
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 6px;
   outline: none;
@@ -39,7 +52,7 @@
 
 .backoffice-login-page__input:focus {
   border-color: var(--accent);
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
 .backoffice-login-page__error {

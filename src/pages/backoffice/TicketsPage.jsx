@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
+import { clearBackofficeSession } from './api.js'
 import './TicketsPage.css'
 
 // Petite "pastille" colorée pour le statut — aide à repérer d'un coup d'œil
@@ -11,9 +12,6 @@ import './TicketsPage.css'
 const STATUS_COLORS = {
   'Nouveau':              '#c0392b',
   'En cours (attribué)':  '#e67e22',
-  'En cours (planifié)':  '#e67e22',
-  'En attente':           '#f1c40f',
-  'Résolu':               '#27ae60',
   'Clos':                 '#7f8c8d'
 }
 
@@ -32,7 +30,7 @@ function BackofficeTicketsPage({ onLock }) {
   const navigate = useNavigate()
 
   function lock() {
-    sessionStorage.removeItem('backoffice_unlocked')
+    clearBackofficeSession()
     onLock()
     navigate('/backoffice/login')
   }
@@ -82,8 +80,10 @@ function BackofficeTicketsPage({ onLock }) {
       onAction={lock}
     >
       <div className="backoffice-tickets-page">
-        <h1>Tickets</h1>
-        <p className="backoffice-tickets-page__intro">Liste en direct depuis GLPI — cliquez sur un ticket pour voir sa fiche détaillée.</p>
+        <header className="backoffice-tickets-page__header">
+          <h1>Tickets</h1>
+          <p className="backoffice-tickets-page__intro">Liste en direct depuis GLPI — cliquez sur un ticket pour voir sa fiche détaillée.</p>
+        </header>
 
         {loading && <p>Chargement…</p>}
 
@@ -93,33 +93,37 @@ function BackofficeTicketsPage({ onLock }) {
           </p>
         )}
 
-        {tickets && tickets.length === 0 && <p>Aucun ticket pour le moment.</p>}
+        {tickets && tickets.length === 0 && (
+          <p className="backoffice-tickets-page__empty">Aucun ticket pour le moment.</p>
+        )}
 
         {tickets && tickets.length > 0 && (
-          <table className="backoffice-tickets-page__table">
-            <thead>
-              <tr>
-                <th>Titre</th>
-                <th>Type</th>
-                <th>Statut</th>
-                <th>Priorité</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.map(ticket => (
-                <tr key={ticket.id}>
-                  <td>
-                    <Link to={`/backoffice/tickets/${ticket.id}`}>{ticket.name}</Link>
-                  </td>
-                  <td>{ticket.type}</td>
-                  <td><StatusBadge status={ticket.status} /></td>
-                  <td>{ticket.priority}</td>
-                  <td>{ticket.date}</td>
+          <div className="backoffice-tickets-page__results">
+            <table className="backoffice-tickets-page__table">
+              <thead>
+                <tr>
+                  <th>Titre</th>
+                  <th>Type</th>
+                  <th>Statut</th>
+                  <th>Priorité</th>
+                  <th>Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {tickets.map(ticket => (
+                  <tr key={ticket.id}>
+                    <td>
+                      <Link to={`/backoffice/tickets/${ticket.id}`}>{ticket.name}</Link>
+                    </td>
+                    <td>{ticket.type}</td>
+                    <td><StatusBadge status={ticket.status} /></td>
+                    <td>{ticket.priority}</td>
+                    <td>{ticket.date}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </Layout>

@@ -1,8 +1,12 @@
 .kanban-settings-page {
-  max-width: 700px;
-  margin: 2rem auto;
   font-family: var(--sans);
   text-align: left;
+}
+
+.kanban-settings-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .kanban-settings-page__intro {
@@ -10,17 +14,17 @@
 }
 
 .kanban-settings-page__form {
-  margin-top: 1.5rem;
+  max-width: 700px;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .kanban-settings-page__section {
   background: var(--surface);
   border: 1px solid var(--border);
   padding: 1.25rem;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .kanban-settings-page__section h2 {
@@ -120,19 +124,23 @@
   background: var(--success-bg);
   color: var(--success);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .kanban-settings-page__error {
   background: var(--danger-bg);
   color: var(--danger);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 /* ── Bouton ───────────────────────────────────────────────────────────────── */
+.kanban-settings-page__form-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .kanban-settings-page__submit {
-  align-self: flex-start;
   padding: 0.6rem 1.5rem;
   font-family: inherit;
   font-size: 1rem;
@@ -157,7 +165,10 @@
 
 /* ── Historique des modifications ─────────────────────────────────────────── */
 .kanban-settings-page__history {
+  max-width: 700px;
   margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
 }
 
 .kanban-settings-page__history h2 {
@@ -183,7 +194,7 @@
 .kanban-settings-page__history-entry {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 0.85rem 1rem;
 }
 
