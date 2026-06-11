@@ -9,18 +9,7 @@
 // n'a pas de token OAuth2 GLPI (authentification par code unique uniquement).
 
 import * as glpi from './glpiV1Client.js'
-
-// Types d'éléments ("assets") que GLPI gère nativement. On les compte tous,
-// même ceux à 0 — un dashboard doit montrer l'ensemble du périmètre, pas
-// seulement ce que l'import a créé (Computer/Monitor).
-const ELEMENT_TYPES = [
-  { itemtype: 'Computer',         label: 'Ordinateurs' },
-  { itemtype: 'Monitor',          label: 'Écrans' },
-  { itemtype: 'NetworkEquipment', label: 'Équipements réseau' },
-  { itemtype: 'Peripheral',       label: 'Périphériques' },
-  { itemtype: 'Phone',            label: 'Téléphones' },
-  { itemtype: 'Printer',          label: 'Imprimantes' }
-]
+import { ASSET_TYPES } from '../shared/assetTypes.js'
 
 // Codes numériques du champ "type" d'un Ticket dans GLPI (vérifiés par un test
 // réel : voir docs internes — Ticket::INCIDENT_TYPE = 1, Ticket::DEMAND_TYPE = 2).
@@ -32,12 +21,10 @@ export async function getDashboardStats() {
   try {
     // ── Comptage des éléments par type ────────────────────────────────────────
     // countItems ne rapatrie qu'un en-tête (Content-Range), pas la liste entière :
-    // léger même si GLPI contenait des milliers d'items.
-    const elements = []
-    for (const { itemtype, label } of ELEMENT_TYPES) {
-      const count = await glpi.countItems(sessionToken, itemtype)
-      elements.push({ itemtype, label, count })
-    }
+    // léger même si GLPI contenait des milliers d'items. En parallèle (Promise.all).
+    const elements = await Promise.all(ASSET_TYPES.map(async ({ itemtype, label }) => ({
+      itemtype, label, count: await glpi.countItems(sessionToken, itemtype)
+    })))
     const totalElements = elements.reduce((sum, e) => sum + e.count, 0)
 
     // ── Comptage des tickets par type ─────────────────────────────────────────

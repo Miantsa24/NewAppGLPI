@@ -4,12 +4,6 @@ import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
 import './ImportPage.css'
 
-// Page d'import : un formulaire à 4 champs fichiers (3 CSV + 1 ZIP), envoyés
-// en une seule requête "multipart/form-data" — le même format qu'un <form> HTML
-// classique avec <input type="file">, mais construit ici en JavaScript via
-// l'objet FormData (API native du navigateur).
-// onLock : même rôle que dans BackofficeHomePage — prévenir App que l'accès
-// backoffice doit être reverrouillé (le bouton apparaît dans la navbar partagée).
 function BackofficeImportPage({ onLock }) {
   const navigate = useNavigate()
 
@@ -19,53 +13,77 @@ function BackofficeImportPage({ onLock }) {
     navigate('/backoffice/login')
   }
 
-  // Un état par fichier sélectionné : on affiche le nom du fichier choisi,
-  // et ça permet de vérifier que les 4 champs sont bien remplis avant l'envoi.
   const [feuille1, setFeuille1] = useState(null)
   const [feuille2, setFeuille2] = useState(null)
   const [feuille3, setFeuille3] = useState(null)
   const [images,   setImages]   = useState(null)
 
-  // "loading" désactive le bouton pendant l'envoi (l'import peut prendre du
-  // temps : plusieurs dizaines d'appels à l'API GLPI s'enchaînent côté serveur).
-  const [loading, setLoading] = useState(false)
-
-  // "result" stocke la réponse du serveur : { ok, log } en cas de succès,
-  // ou { ok: false, error } en cas d'échec — affiché tel quel à l'écran.
-  const [result, setResult] = useState(null)
+  const [loading,  setLoading]  = useState(false)
+  // "progress" : dernier événement de progression reçu via SSE.
+  // null = l'import n'a pas encore commencé (ou on affiche la barre indéterminée).
+  // { percent, label } = étape courante connue.
+  const [progress, setProgress] = useState(null)
+  const [result,   setResult]   = useState(null)
 
   async function handleSubmit(event) {
-    // Empêche le rechargement de page par défaut d'un <form> HTML —
-    // on veut gérer l'envoi nous-mêmes, en JavaScript, sans navigation.
     event.preventDefault()
 
-    // FormData : structure native du navigateur représentant un corps
-    // "multipart/form-data". Chaque .append(nom, fichier) ajoute un champ —
-    // les noms ("feuille1", "feuille2"...) doivent correspondre EXACTEMENT
-    // à ceux attendus par multer côté serveur (upload.fields([{ name: ... }])).
     const formData = new FormData()
     formData.append('feuille1', feuille1)
-    formData.append('feuille2', feuille2)
-    formData.append('feuille3', feuille3)
-    formData.append('images',   images)
+    // Feuille 2 (tickets), feuille 3 (coûts) et le ZIP d'images sont optionnels —
+    // on ne les ajoute que s'ils ont été sélectionnés.
+    if (feuille2) formData.append('feuille2', feuille2)
+    if (feuille3) formData.append('feuille3', feuille3)
+    if (images) formData.append('images', images)
 
     setLoading(true)
+    setProgress(null)
     setResult(null)
 
     try {
-      // Pas d'en-tête "Content-Type" à fixer manuellement : le navigateur le
-      // génère lui-même à partir d'un FormData, AVEC la "boundary" (frontière)
-      // correcte qui sépare les parties du corps multipart. Le fixer à la main
-      // casserait l'envoi (boundary manquante ou incohérente).
       const response = await fetch('http://localhost:3001/api/backoffice/import', {
         method: 'POST',
         body:   formData
       })
-      const data = await response.json()
-      // Le détail technique part dans la console — l'affichage à l'écran
-      // (ci-dessous) ne montre qu'un message en texte clair en cas d'échec.
-      if (!data.ok) console.error('Échec de l\'import :', data.error)
-      setResult(data)
+
+      // 400 = fichiers manquants : réponse JSON classique, pas SSE
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setResult({ ok: false, error: data.error })
+        return
+      }
+
+      // Lecture du flux SSE.
+      // Format de chaque événement : "data: {json}\n\n"
+      // Plusieurs événements peuvent arriver dans un même "chunk" lu par reader.read(),
+      // ou un seul événement peut être fragmenté en plusieurs chunks — d'où le buffer.
+      const reader  = response.body.getReader()
+      const decoder = new TextDecoder()
+      let   buffer  = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        // { stream: true } : signale au décodeur que d'autres chunks vont suivre —
+        // il ne génère pas de caractère de remplacement pour les séquences UTF-8
+        // qui se coupent en plein milieu d'un chunk.
+        buffer += decoder.decode(value, { stream: true })
+
+        // Chaque événement SSE est séparé par une ligne vide (double \n).
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() // dernier fragment potentiellement incomplet
+
+        for (const part of parts) {
+          const line = part.trim()
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'progress') setProgress(event)
+            else if (event.type === 'done') setResult(event)
+          } catch { /* fragment malformé */ }
+        }
+      }
     } catch (err) {
       console.error('Échec de l\'import :', err.message)
       setResult({ ok: false })
@@ -74,8 +92,7 @@ function BackofficeImportPage({ onLock }) {
     }
   }
 
-  // Tous les champs doivent être remplis pour activer le bouton d'envoi.
-  const canSubmit = feuille1 && feuille2 && feuille3 && images && !loading
+  const canSubmit = feuille1 && !loading
 
   return (
     <Layout
@@ -87,9 +104,11 @@ function BackofficeImportPage({ onLock }) {
     <div className="import-page">
       <h1>Import de données</h1>
       <p className="import-page__intro">
-        Sélectionnez les 3 fichiers CSV (« Import-data-juin-26 ») et le fichier
-        ZIP contenant les images, puis lancez l'import. Chaque création dans
-        GLPI est journalisée pour permettre une réinitialisation ultérieure.
+        Seule la feuille 1 (« Éléments ») est obligatoire. Les feuilles 2
+        (tickets) et 3 (coûts de tickets), ainsi que le fichier ZIP contenant
+        les images, sont optionnels et peuvent être importés indépendamment.
+        Chaque création dans GLPI est journalisée pour permettre une
+        réinitialisation ultérieure.
       </p>
 
       <form onSubmit={handleSubmit} className="import-page__form">
@@ -97,19 +116,16 @@ function BackofficeImportPage({ onLock }) {
           Feuille 1 — Éléments (CSV)
           <input type="file" accept=".csv" onChange={e => setFeuille1(e.target.files[0])} />
         </label>
-
         <label>
-          Feuille 2 — Tickets (CSV)
+          Feuille 2 — Tickets (CSV) — optionnel
           <input type="file" accept=".csv" onChange={e => setFeuille2(e.target.files[0])} />
         </label>
-
         <label>
-          Feuille 3 — Coûts de tickets (CSV)
+          Feuille 3 — Coûts de tickets (CSV) — optionnel
           <input type="file" accept=".csv" onChange={e => setFeuille3(e.target.files[0])} />
         </label>
-
         <label>
-          Images (ZIP)
+          Images (ZIP) — optionnel
           <input type="file" accept=".zip" onChange={e => setImages(e.target.files[0])} />
         </label>
 
@@ -118,13 +134,29 @@ function BackofficeImportPage({ onLock }) {
         </button>
       </form>
 
-      {/* Barre de progression indéterminée : le serveur traite tout en une seule
-          requête et ne renvoie le résultat qu'à la toute fin — impossible de
-          connaître une vraie progression en %. La barre s'anime juste en boucle
-          pour montrer que l'import est en cours (pattern courant pour ce cas). */}
+      {/* Barre de progression : indéterminée tant que le premier événement SSE
+          n'est pas arrivé (phase d'envoi des fichiers), puis déterminée dès
+          que le serveur commence à émettre sa progression. */}
       {loading && (
-        <div className="import-page__progress" role="progressbar" aria-label="Import en cours">
-          <div className="import-page__progress-bar"></div>
+        <div className="import-page__progress-wrap">
+          <p className="import-page__step-label">
+            {progress?.label ?? 'Envoi des fichiers…'}
+          </p>
+          <div
+            className="import-page__progress"
+            role="progressbar"
+            aria-valuenow={progress?.percent ?? 0}
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div
+              className={`import-page__progress-bar${!progress ? ' import-page__progress-bar--indeterminate' : ''}`}
+              style={progress ? { width: `${progress.percent}%` } : undefined}
+            />
+          </div>
+          {progress && (
+            <span className="import-page__percent">{progress.percent} %</span>
+          )}
         </div>
       )}
 
@@ -135,8 +167,6 @@ function BackofficeImportPage({ onLock }) {
               <p className="import-page__success">
                 Import terminé avec succès — {result.log.length} opération(s) effectuée(s).
               </p>
-              {/* "log" : tableau de messages texte renvoyé par le pipeline,
-                  un par opération effectuée (création, association, ou ignorée). */}
               <ul className="import-page__log">
                 {result.log.map((line, index) => <li key={index}>{line}</li>)}
               </ul>

@@ -4,11 +4,6 @@ import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
 import './ResetPage.css'
 
-// Page dédiée à la réinitialisation des données importées — sortie de la page
-// d'accueil du Backoffice pour que cette action destructrice ait son propre
-// espace, plutôt que de cohabiter avec la simple navigation.
-// onLock : même rôle que dans BackofficeHomePage — prévenir App que l'accès
-// backoffice doit être reverrouillé (le bouton apparaît dans la navbar partagée).
 function BackofficeResetPage({ onLock }) {
   const navigate = useNavigate()
 
@@ -18,17 +13,13 @@ function BackofficeResetPage({ onLock }) {
     navigate('/backoffice/login')
   }
 
-  // "loading" désactive le bouton pendant l'opération (la suppression de
-  // dizaines d'items dans GLPI prend quelques secondes).
-  // "result" stocke { ok, log } renvoyé par le serveur, affiché tel quel.
-  const [resetLoading, setResetLoading] = useState(false)
-  const [resetResult,  setResetResult]  = useState(null)
+  const [resetLoading,  setResetLoading]  = useState(false)
+  // "resetProgress" : dernier événement SSE de progression.
+  // { current, total, percent, label } une fois la suppression commencée.
+  const [resetProgress, setResetProgress] = useState(null)
+  const [resetResult,   setResetResult]   = useState(null)
 
   async function handleReset() {
-    // window.confirm() : boîte de dialogue native du navigateur, bloquante —
-    // le code ne continue QUE si l'utilisateur clique sur "OK". C'est la façon
-    // la plus simple de répondre à l'exigence "bouton avec confirmation" pour
-    // une action destructrice (suppression dans GLPI).
     const confirmed = window.confirm(
       'Supprimer toutes les données importées dans GLPI ?\n\n' +
       'Cette action est IRRÉVERSIBLE : tous les éléments, tickets, images et ' +
@@ -37,15 +28,35 @@ function BackofficeResetPage({ onLock }) {
     if (!confirmed) return
 
     setResetLoading(true)
+    setResetProgress(null)
     setResetResult(null)
 
     try {
       const response = await fetch('http://localhost:3001/api/backoffice/reset', { method: 'POST' })
-      const data = await response.json()
-      // Le détail technique part dans la console — l'affichage à l'écran
-      // (ci-dessous) ne montre qu'un message en texte clair en cas d'échec.
-      if (!data.ok) console.error('Échec de la réinitialisation :', data.error)
-      setResetResult(data)
+
+      // Lecture du flux SSE — même logique que ImportPage.
+      const reader  = response.body.getReader()
+      const decoder = new TextDecoder()
+      let   buffer  = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop()
+
+        for (const part of parts) {
+          const line = part.trim()
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'progress') setResetProgress(event)
+            else if (event.type === 'done') setResetResult(event)
+          } catch { /* fragment malformé */ }
+        }
+      }
     } catch (err) {
       console.error('Échec de la réinitialisation :', err.message)
       setResetResult({ ok: false })
@@ -75,12 +86,31 @@ function BackofficeResetPage({ onLock }) {
           {resetLoading ? 'Suppression en cours…' : 'Réinitialiser les données importées'}
         </button>
 
-        {/* Barre de progression indéterminée : même raison que sur la page
-            d'import — le serveur ne renvoie le résultat qu'à la toute fin,
-            donc pas de vrai pourcentage possible, juste une animation en boucle. */}
+        {/* Barre de progression : indéterminée pendant la connexion à GLPI,
+            puis déterminée dès que le serveur commence à supprimer des items
+            et émet des événements SSE avec current/total/percent. */}
         {resetLoading && (
-          <div className="reset-page__progress" role="progressbar" aria-label="Réinitialisation en cours">
-            <div className="reset-page__progress-bar"></div>
+          <div className="reset-page__progress-wrap">
+            <p className="reset-page__step-label">
+              {resetProgress?.label ?? 'Connexion à GLPI…'}
+            </p>
+            <div
+              className="reset-page__progress"
+              role="progressbar"
+              aria-valuenow={resetProgress?.percent ?? 0}
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <div
+                className={`reset-page__progress-bar${!resetProgress ? ' reset-page__progress-bar--indeterminate' : ''}`}
+                style={resetProgress ? { width: `${resetProgress.percent}%` } : undefined}
+              />
+            </div>
+            {resetProgress && (
+              <span className="reset-page__percent">
+                {resetProgress.current} / {resetProgress.total} — {resetProgress.percent} %
+              </span>
+            )}
           </div>
         )}
 

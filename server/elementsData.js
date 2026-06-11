@@ -39,10 +39,10 @@ function summarize(item) {
 }
 
 // ── Liste des éléments d'un type donné ────────────────────────────────────────
-// "itemtype" couvre les 6 types d'"assets" gérés par ce projet (Computer,
-// Monitor, NetworkEquipment, Peripheral, Phone, Printer) — un seul module
-// générique, comme la recherche FrontOffice (ElementsPage) qui traite déjà
-// ces 6 types de façon uniforme.
+// "itemtype" couvre les types d'"assets" affichés par ce projet (voir
+// shared/assetTypes.js : Computer, Monitor, Phone) — un seul module générique,
+// comme la recherche FrontOffice (ElementsPage) qui traite déjà ces types de
+// façon uniforme.
 export async function listElements(itemtype) {
   const sessionToken = await glpi.openSession()
   try {

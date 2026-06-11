@@ -2,8 +2,9 @@
 //
 // Vue d'ensemble du déroulé (dans cet ordre, car chaque étape dépend de la
 // précédente — exactement l'ordre dans lequel on journalise les créations) :
-//   1. Feuille 1 → crée les éléments (Computer/Monitor) + leurs données de
-//      référence (Location, Manufacturer, State, Model, User) en "find-or-create"
+//   1. Feuille 1 → crée les éléments (n'importe quel type d'asset GLPI) +
+//      leurs données de référence (Location, Manufacturer, State, Model,
+//      User) en "find-or-create"
 //   2. ZIP       → associe chaque image à l'élément dont le NOM correspond
 //      au nom du fichier (ex. "PC-ADM-001.png" → élément "PC-ADM-001")
 //   3. Feuille 2 → crée les tickets, et les relie aux éléments listés dans
@@ -15,19 +16,34 @@
 
 import { parse } from 'csv-parse/sync'
 import AdmZip    from 'adm-zip'
+import sharp     from 'sharp'
 import path      from 'path'
 import os        from 'os'
 import fs        from 'fs'
 import db        from './db.js'
-import * as glpi from './glpiV1Client.js'
+import * as glpi   from './glpiV1Client.js'
+import * as glpiV2 from './glpiV2Client.js'
+
+// Correspondance extension de fichier → format détecté par sharp (sniffing du
+// contenu réel, indépendant de l'extension). Sert à repérer les fichiers
+// renommés (ex. un .jpg renommé en .png) — voir importImages.
+const FORMAT_BY_EXTENSION = {
+  jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif',
+  webp: 'webp', tif: 'tiff', tiff: 'tiff', bmp: 'bmp'
+}
 
 // ── Tables de correspondance texte CSV → codes numériques attendus par GLPI ───
 // GLPI stocke type/statut/priorité des tickets sous forme de petits entiers
 // (définis par des constantes PHP comme Ticket::INCIDENT_TYPE = 1). On a vérifié
 // ces valeurs en créant un ticket de test et en relisant ses champs.
 const TICKET_TYPES = { Incident: 1, Demande: 2, Request: 2 }
-const TICKET_STATUSES = { New: 1, Processing: 2, Planned: 3, Pending: 4, Solved: 5, Closed: 6 }
-const TICKET_PRIORITIES = { 'Very low': 1, Low: 2, Medium: 3, High: 4, 'Very high': 5, Major: 6 }
+const TICKET_STATUSES = {
+  New: 1, Processing: 2, 'In Progress': 2, Planned: 3,
+  Pending: 4, Solved: 5, Resolved: 5, Closed: 6
+}
+const TICKET_PRIORITIES = {
+  'Very low': 1, Low: 2, Medium: 3, High: 4, 'Very high': 5, Major: 6, Critical: 6
+}
 
 // "DD/MM/YYYY" + "HH:MM" → "YYYY-MM-DD HH:MM:SS" (format datetime attendu par GLPI)
 function toGlpiDateTime(dateStr, timeStr) {
@@ -78,11 +94,20 @@ async function findOrCreate(ctx, itemtype, name, extraFields = {}) {
   return id
 }
 
-// ── Étape 1 : Feuille 1 — éléments (Computer / Monitor) ────────────────────────
+// ── Étape 1 : Feuille 1 — éléments (TOUS les types d'assets GLPI) ──────────────
+// "Item_Type" peut désormais être n'importe quel itemtype GLPI valide (Computer,
+// Monitor, Phone, NetworkEquipment, Printer, Rack, Software...), pas seulement
+// les quelques types ayant une page dédiée dans l'UI.
 async function importAssets(ctx, csvText, log) {
   const rows = parse(csvText, { columns: true, skip_empty_lines: true })
 
   for (const row of rows) {
+    const itemtype = row.Item_Type
+    if (!itemtype) {
+      log.push(`Ligne ignorée : colonne "Item_Type" vide (élément "${row.Name}").`)
+      continue
+    }
+
     // Quatre données de référence à résoudre AVANT de pouvoir créer l'élément
     // (l'élément a besoin de leurs id, donc elles doivent exister en premier).
     const locationId     = await findOrCreate(ctx, 'Location', row.Location)
@@ -90,40 +115,88 @@ async function importAssets(ctx, csvText, log) {
     const stateId        = await findOrCreate(ctx, 'State', row.Status)
     const userId         = await findOrCreate(ctx, 'User', row.User)
 
-    // "Item_Type" du CSV vaut déjà "Computer" ou "Monitor" — ce sont les noms
-    // GLPI exacts des types. Mais leur table de modèles diffère selon le type
-    // (ComputerModel vs MonitorModel), d'où ce petit aiguillage.
-    const itemtype   = row.Item_Type
-    const modelType  = itemtype === 'Monitor' ? 'MonitorModel'    : 'ComputerModel'
-    const modelField = itemtype === 'Monitor' ? 'monitormodels_id' : 'computermodels_id'
-    const modelId    = await findOrCreate(ctx, modelType, row.Model)
-
-    const itemId = await glpi.createItem(ctx.sessionToken, itemtype, {
+    const fields = {
       name:             row.Name,
       locations_id:     locationId,
       manufacturers_id: manufacturerId,
       states_id:        stateId,
       users_id:         userId,
-      serial:           row.Inventory_Number,
-      [modelField]:     modelId
-    })
+      serial:           row.Inventory_Number
+    }
+
+    // La plupart des types GLPI suivent la convention "<Type>Model" /
+    // "<type>models_id" (ComputerModel/computermodels_id, PhoneModel/
+    // phonemodels_id...), mais certains types n'ont PAS de table de modèles
+    // (ex. Software). Si la résolution échoue, on crée l'élément sans modèle
+    // plutôt que d'abandonner toute la ligne.
+    if (row.Model) {
+      const modelType  = `${itemtype}Model`
+      const modelField = `${itemtype.toLowerCase()}models_id`
+      try {
+        fields[modelField] = await findOrCreate(ctx, modelType, row.Model)
+      } catch {
+        log.push(`Modèle "${row.Model}" ignoré pour "${row.Name}" : "${modelType}" n'existe pas dans GLPI.`)
+      }
+    }
+
+    let itemId
+    let viaV2 = false
+    try {
+      itemId = await glpi.createItem(ctx.sessionToken, itemtype, fields)
+    } catch (err) {
+      if (!glpiV2.isUnsupportedInV1(err)) {
+        const detail = err.response?.data?.[1] ?? err.message
+        log.push(`Élément "${row.Name}" (${itemtype}) ignoré : ${detail}`)
+        continue
+      }
+
+      // Repli v2 : itemtype absent de la v1 (ex. "Socket"), exposé en v2 sous
+      // "/Assets/<Type>" — format de champs différent (objets imbriqués { id }
+      // plutôt que des clés plates "*_id"). Seuls "name" et "location" ont un
+      // équivalent direct dans le schéma v2 de ces types.
+      try {
+        const v2Fields = { name: fields.name }
+        if (locationId) v2Fields.location = { id: locationId }
+        itemId = await glpiV2.createItem(itemtype, v2Fields)
+        viaV2 = true
+        log.push(`${itemtype} "${row.Name}" créé via l'API v2 (id ${itemId}).`)
+      } catch (err2) {
+        const detail = err2.response?.data?.title ?? err2.message
+        log.push(`Élément "${row.Name}" (${itemtype}) ignoré : ${detail}`)
+        continue
+      }
+    }
     journalize(ctx, itemtype, itemId, row.Name)
 
     // Mémorisé pour les étapes suivantes : association des images (étape 2) et
     // des tickets (étape 3) — toutes deux référencent les éléments PAR NOM.
-    ctx.assetsByName.set(row.Name, { itemtype, id: itemId })
+    // "viaV2" : itemtype absent de la v1 (ex. "Socket") — voir importTickets,
+    // qui doit éviter de créer un Item_Ticket vers un tel élément (la v1
+    // plante avec une erreur 500 non gérée plutôt qu'un refus propre).
+    ctx.assetsByName.set(row.Name, { itemtype, id: itemId, viaV2 })
     log.push(`${itemtype} "${row.Name}" créé (id ${itemId})`)
   }
 }
 
-// ── Étape 2 : ZIP — association des images aux éléments ────────────────────────
+// ── Étape 2 : ZIP — association des images aux éléments (optionnelle) ─────────
 // Règle de correspondance : le nom du fichier SANS extension doit être identique
 // au nom d'un élément créé à l'étape 1 (ex. "PC-ADM-001.png" → élément "PC-ADM-001").
+//
+// Certains fichiers du ZIP sont en réalité un autre format que leur extension
+// ne l'indique (ex. un JPEG renommé en .png lors de la préparation du jeu de
+// données) : GLPI refuse alors le contenu. On détecte ce cas avec sharp (qui
+// lit le format réel depuis les octets, pas l'extension) et on reconvertit en
+// JPEG avant l'upload — le nom de base reste identique, donc l'association à
+// l'élément (par nom) continue de fonctionner.
 async function importImages(ctx, zipBuffer, log) {
+  if (!zipBuffer) {
+    log.push('Aucun fichier ZIP fourni : étape d\'association des images ignorée.')
+    return
+  }
+
   const zip = new AdmZip(zipBuffer)
 
-  // Dossier temporaire : l'API v1 lit le fichier depuis le DISQUE (fs.createReadStream),
-  // alors que le ZIP est en mémoire — il faut donc extraire chaque image avant upload.
+  // Dossier temporaire : l'API v1 lit le fichier depuis le DISQUE (fs.createReadStream).
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'newapp-import-'))
 
   try {
@@ -132,19 +205,38 @@ async function importImages(ctx, zipBuffer, log) {
       // compression — à ignorer, ce n'est pas une vraie image.
       if (entry.isDirectory || entry.entryName.startsWith('__MACOSX')) continue
 
-      const fileName  = path.basename(entry.entryName)        // "PC-ADM-001.png"
-      const assetName = path.parse(fileName).name             // "PC-ADM-001"
-      const asset     = ctx.assetsByName.get(assetName)
+      const originalName = path.basename(entry.entryName)     // "PC-ADM-001.png"
+      const assetName     = path.parse(originalName).name      // "PC-ADM-001"
+      const asset         = ctx.assetsByName.get(assetName)
 
       if (!asset) {
-        log.push(`Image "${fileName}" ignorée : aucun élément nommé "${assetName}"`)
+        log.push(`Image "${originalName}" ignorée : aucun élément nommé "${assetName}"`)
         continue
       }
 
-      // maintainEntryPath=false : extrait directement dans tmpDir, sans recréer
-      // le sous-dossier "images/" du ZIP. overwrite=true : écrase si déjà présent.
-      zip.extractEntryTo(entry, tmpDir, false, true)
+      let fileName    = originalName
+      let fileContent = entry.getData()
+
+      // Vérifie que le format réel (sniffé par sharp) correspond à l'extension
+      // déclarée. Si le fichier est illisible ou que le format diffère, on le
+      // reconvertit en JPEG.
+      const declaredExt = path.extname(originalName).slice(1).toLowerCase()
+      const declaredFormat = FORMAT_BY_EXTENSION[declaredExt] ?? declaredExt
+
+      try {
+        const metadata = await sharp(fileContent).metadata()
+        if (metadata.format !== declaredFormat) {
+          fileContent = await sharp(fileContent).jpeg().toBuffer()
+          fileName    = `${assetName}.jpg`
+          log.push(`Image "${originalName}" : format réel "${metadata.format}" ≠ extension ".${declaredExt}" — convertie en JPEG.`)
+        }
+      } catch (err) {
+        log.push(`Image "${originalName}" ignorée : fichier image illisible (${err.message})`)
+        continue
+      }
+
       const filePath = path.join(tmpDir, fileName)
+      fs.writeFileSync(filePath, fileContent)
 
       const documentId = await glpi.uploadDocument(ctx.sessionToken, { filePath, fileName })
       journalize(ctx, 'Document', documentId, fileName)
@@ -163,8 +255,13 @@ async function importImages(ctx, zipBuffer, log) {
   }
 }
 
-// ── Étape 3 : Feuille 2 — tickets + association aux éléments ──────────────────
+// ── Étape 3 : Feuille 2 — tickets + association aux éléments (optionnelle) ────
 async function importTickets(ctx, csvText, log) {
+  if (!csvText) {
+    log.push('Aucun fichier "Feuille 2" fourni : import des tickets ignoré.')
+    return
+  }
+
   const rows = parse(csvText, { columns: true, skip_empty_lines: true })
 
   for (const row of rows) {
@@ -190,18 +287,46 @@ async function importTickets(ctx, csvText, log) {
         log.push(`Association ignorée : aucun élément nommé "${name}" (ticket "${row.Titre}")`)
         continue
       }
-      const linkId = await glpi.createItem(ctx.sessionToken, 'Item_Ticket', {
-        tickets_id: ticketId,
-        itemtype:   asset.itemtype,
-        items_id:   asset.id
-      })
-      journalize(ctx, 'Item_Ticket', linkId, `${name} → ticket "${row.Titre}"`)
+      if (asset.viaV2) {
+        // L'API v1 ne reconnaît pas cet itemtype (ex. "Socket") : Item_Ticket
+        // (CommonItilObject_Item::prepareInputForAdd) plante avec une erreur 500
+        // au lieu d'un refus propre dans ce cas — on évite l'appel.
+        log.push(`Association ignorée : "${name}" (${asset.itemtype}) n'est pas liable à un ticket via l'API v1 (ticket "${row.Titre}")`)
+        continue
+      }
+      // GLPI refuse via l'API la création d'un Item_Ticket sur un ticket "Closed"
+      // (droits insuffisants, cf. CommonItilObject_Item::canCreateItem) — sans ce
+      // try/catch, une seule association refusée faisait échouer TOUT l'import
+      // (et les 99 tickets suivants n'étaient jamais créés).
+      try {
+        const linkId = await glpi.createItem(ctx.sessionToken, 'Item_Ticket', {
+          tickets_id: ticketId,
+          itemtype:   asset.itemtype,
+          items_id:   asset.id
+        })
+        journalize(ctx, 'Item_Ticket', linkId, `${name} → ticket "${row.Titre}"`)
+      } catch (err) {
+        const detail = err.response?.data?.[1] ?? err.message
+        log.push(`Association ignorée : "${name}" → ticket "${row.Titre}" : ${detail}`)
+      }
     }
   }
 }
 
-// ── Étape 4 : Feuille 3 — coûts de ticket ──────────────────────────────────────
+// ── Étape 4 : Feuille 3 — coûts de ticket (optionnelle) ────────────────────────
 async function importTicketCosts(ctx, csvText, log) {
+  if (!csvText) {
+    log.push('Aucun fichier "Feuille 3" fourni : import des coûts ignoré.')
+    return
+  }
+
+  // Les coûts référencent des tickets créés par la feuille 2 — sans elle,
+  // il n'y a aucun ticket auquel les rattacher.
+  if (ctx.ticketsByRef.size === 0) {
+    log.push('Feuille 3 ignorée : aucun ticket importé (feuille 2 absente ou vide).')
+    return
+  }
+
   const rows = parse(csvText, { columns: true, skip_empty_lines: true })
 
   for (const row of rows) {
@@ -224,16 +349,9 @@ async function importTicketCosts(ctx, csvText, log) {
 }
 
 // ── Réinitialisation : supprime tout ce que le journal a enregistré ───────────
-// Principe (déjà validé manuellement pendant les tests de l'import) :
-//   - On relit le journal du PLUS RÉCENT au PLUS ANCIEN (ORDER BY id DESC).
-//   - "id" reflète l'ordre de CRÉATION : un Computer est créé APRÈS la Location
-//     qu'il référence (il a besoin de son id). En supprimant du plus récent au
-//     plus ancien (LIFO — "Last In, First Out"), on supprime donc TOUJOURS un
-//     item AVANT ce dont il dépend : aucune contrainte de clé étrangère ne peut
-//     jamais être violée. C'est la même logique que "défaire" une pile d'actions.
-//   - Une fois tout supprimé côté GLPI, on vide le journal : NewApp "oublie"
-//     l'import, prêt pour un nouveau cycle import → vérification → réinitialisation.
-export async function resetImportedData() {
+// "onProgress" : callback appelé après chaque suppression — permet au serveur
+// d'émettre un événement SSE avec la progression réelle (i/total) vers le client.
+export async function resetImportedData({ onProgress } = {}) {
   const log = []
   const sessionToken = await glpi.openSession()
 
@@ -245,16 +363,37 @@ export async function resetImportedData() {
       return { ok: true, log }
     }
 
-    for (const row of rows) {
+    const total = rows.length
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      // On émet AVANT la suppression : l'utilisateur voit "Suppression X/total"
+      // pendant que l'appel GLPI est en cours — l'UX est plus réactive.
+      onProgress?.({
+        type:    'progress',
+        current: i + 1,
+        total,
+        percent: Math.round(((i + 1) / total) * 100),
+        label:   `Suppression ${i + 1}/${total} — ${row.glpi_itemtype} « ${row.label} »`
+      })
       try {
         await glpi.deleteItem(sessionToken, row.glpi_itemtype, row.glpi_id)
         log.push(`Supprimé : ${row.glpi_itemtype} "${row.label}" (id ${row.glpi_id})`)
       } catch (err) {
-        // On NE STOPPE PAS la boucle sur une erreur isolée (ex. l'item a déjà
-        // été supprimé manuellement dans GLPI entre-temps) : on note l'échec
-        // et on continue, pour nettoyer le maximum possible.
-        const detail = err.response?.data?.[1] ?? err.message
-        log.push(`Échec suppression ${row.glpi_itemtype} "${row.label}" (id ${row.glpi_id}) : ${detail}`)
+        if (!glpiV2.isUnsupportedInV1(err)) {
+          const detail = err.response?.data?.[1] ?? err.message
+          log.push(`Échec suppression ${row.glpi_itemtype} "${row.label}" (id ${row.glpi_id}) : ${detail}`)
+          continue
+        }
+
+        // Repli v2 : itemtype créé via le repli v2 à l'import (ex. "Socket"),
+        // donc supprimable uniquement via "/Assets/<Type>" en v2.
+        try {
+          await glpiV2.deleteItem(row.glpi_itemtype, row.glpi_id)
+          log.push(`Supprimé via l'API v2 : ${row.glpi_itemtype} "${row.label}" (id ${row.glpi_id})`)
+        } catch (err2) {
+          const detail = err2.response?.data?.title ?? err2.message
+          log.push(`Échec suppression ${row.glpi_itemtype} "${row.label}" (id ${row.glpi_id}) : ${detail}`)
+        }
       }
     }
 
@@ -268,31 +407,38 @@ export async function resetImportedData() {
 }
 
 // ── Point d'entrée : orchestre les 4 étapes dans une session v1 unique ────────
-// Reçoit le contenu BRUT des 3 CSV (texte) et le ZIP (Buffer binaire).
-// Retourne { ok, log } : "log" est un tableau de messages, affiché tel quel
-// côté frontend comme écran de résultat (succès/erreurs).
-export async function runImport({ feuille1Csv, feuille2Csv, feuille3Csv, zipBuffer }) {
+// "onProgress" : callback optionnel appelé avant chaque étape (percent = début
+// de l'étape). Permet au serveur de streamer la progression SSE sans avoir à
+// changer l'interface de chaque fonction interne.
+export async function runImport({ feuille1Csv, feuille2Csv, feuille3Csv, zipBuffer, onProgress }) {
   const log = []
   const sessionToken = await glpi.openSession()
 
   const ctx = {
     sessionToken,
-    cache:         new Map(),  // données de référence : Map(itemtype → Map(nom → id))
-    assetsByName:  new Map(),  // Map(nom d'élément → { itemtype, id })
-    ticketsByRef:  new Map(),  // Map(Ref_Ticket → id GLPI du ticket)
+    cache:         new Map(),
+    assetsByName:  new Map(),
+    ticketsByRef:  new Map(),
     insertJournal: db.prepare('INSERT INTO import_journal (glpi_itemtype, glpi_id, label) VALUES (?, ?, ?)')
   }
 
   try {
+    onProgress?.({ type: 'progress', percent: 5,  label: 'Import des éléments (feuille 1)…' })
     await importAssets(ctx, feuille1Csv, log)
+
+    onProgress?.({ type: 'progress', percent: 30, label: 'Association des images (ZIP)…' })
     await importImages(ctx, zipBuffer, log)
+
+    onProgress?.({ type: 'progress', percent: 55, label: 'Import des tickets (feuille 2)…' })
     await importTickets(ctx, feuille2Csv, log)
+
+    onProgress?.({ type: 'progress', percent: 80, label: 'Import des coûts (feuille 3)…' })
     await importTicketCosts(ctx, feuille3Csv, log)
+
+    onProgress?.({ type: 'progress', percent: 100, label: 'Import terminé !' })
 
     return { ok: true, log }
   } finally {
-    // Toujours fermer la session, même si une étape a levé une exception —
-    // sinon l'erreur remonterait avant la fermeture et laisserait une session ouverte.
     await glpi.closeSession(sessionToken)
   }
 }

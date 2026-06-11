@@ -19,8 +19,8 @@ voici ce qui sont déjà fait:
 -j'ai déjà le projet  GLPI 11 et il marche localement
 
 voici notre plan d'étude pour cette J-0:
-- faire la compréhension complète du projet GLPI(architecture + modules + workflow + base de donnée + tables relationnelles) [FAIT]
-- API (compréhension + activation clé + appel/test API) [FAIT]
+- faire la compréhension complète du projet GLPI(architecture + modules + workflow + base de donnée + tables relationnelles) 
+- API (compréhension + activation clé + appel/test API) 
 - création de NewApp en React-Vite(avec authentification entre NewApp et ExistingApp) et SQLite
 - test de connexion entre ExistingApp et NewApp
 - création des fonctionnalités(import + réinitialisation et autres)

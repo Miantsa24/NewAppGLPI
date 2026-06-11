@@ -4,23 +4,12 @@ import Layout from '../../components/Layout.jsx'
 import { BACKOFFICE_NAV_LINKS } from './navLinks.js'
 import './ElementsPage.css'
 
-// Les 4 types restants une fois Ordinateur et Écran sortis dans leurs propres
-// menus — mêmes types que côté FrontOffice (CreateElementPage), pour rester
-// cohérent sur ce qui constitue "les autres éléments" dans ce projet.
-const OTHER_ELEMENT_TYPES = [
-  { itemtype: 'NetworkEquipment', label: 'Équipements réseau' },
-  { itemtype: 'Peripheral',       label: 'Périphériques' },
-  { itemtype: 'Phone',            label: 'Téléphones' },
-  { itemtype: 'Printer',          label: 'Imprimantes' }
-]
-
 // onLock : même rôle que dans BackofficeTicketsPage — prévenir App que l'accès
 // backoffice doit être reverrouillé.
 //
-// "itemtype" : type GLPI fixe pour les pages dédiées (Computer, Monitor) ;
-// la valeur spéciale "others" déclenche un sélecteur parmi les 4 types restants
-// — un seul composant générique pour les trois entrées de menu (Ordinateurs /
-// Écrans / Autres éléments), comme convenu ("Une page par catégorie").
+// "itemtype" : type GLPI fixe pour la page (Computer, Monitor, Phone) — un seul
+// composant générique pour les trois entrées de menu (Ordinateurs / Téléphones
+// / Écrans).
 function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
   const navigate = useNavigate()
 
@@ -30,17 +19,10 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
     navigate('/backoffice/login')
   }
 
-  const isOtherCategory = itemtype === 'others'
-  const [selectedType, setSelectedType] = useState(OTHER_ELEMENT_TYPES[0].itemtype)
-  const targetType = isOtherCategory ? selectedType : itemtype
-
   const [elements, setElements] = useState(null)
   const [error,    setError]    = useState(null)
   const [loading,  setLoading]  = useState(true)
 
-  // [targetType] en dépendance : si l'utilisateur change de type via le
-  // sélecteur (page "Autres éléments"), on relance le chargement avec le
-  // nouveau type plutôt que de garder l'ancienne liste affichée.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -49,7 +31,7 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
 
     async function loadElements() {
       try {
-        const response = await fetch(`http://localhost:3001/api/backoffice/elements/${targetType}`)
+        const response = await fetch(`http://localhost:3001/api/backoffice/elements/${itemtype}`)
         const data = await response.json()
         if (cancelled) return
 
@@ -73,7 +55,7 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
 
     loadElements()
     return () => { cancelled = true }
-  }, [targetType])
+  }, [itemtype])
 
   return (
     <Layout
@@ -85,19 +67,6 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
       <div className="backoffice-elements-page">
         <h1>{pageTitle}</h1>
         <p className="backoffice-elements-page__intro">{intro}</p>
-
-        {isOtherCategory && (
-          <div className="backoffice-elements-page__type">
-            <label>
-              Type d'élément {' '}
-              <select value={selectedType} onChange={e => setSelectedType(e.target.value)}>
-                {OTHER_ELEMENT_TYPES.map(({ itemtype: type, label }) => (
-                  <option key={type} value={type}>{label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
 
         {loading && <p>Chargement…</p>}
 
@@ -123,7 +92,7 @@ function BackofficeElementsPage({ onLock, pageTitle, itemtype, intro }) {
               {elements.map(element => (
                 <tr key={element.id}>
                   <td>
-                    <Link to={`/backoffice/elements/${targetType}/${element.id}`}>{element.name}</Link>
+                    <Link to={`/backoffice/elements/${itemtype}/${element.id}`}>{element.name}</Link>
                   </td>
                   <td>{element.serial ?? '—'}</td>
                   <td>{element.otherserial ?? '—'}</td>

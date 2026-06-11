@@ -55,6 +55,17 @@ db.exec(`
   )
 `)
 
+// Historique des modifications des paramètres Kanban.
+// Une ligne par sauvegarde, "changes" = JSON des champs modifiés avec leurs anciennes
+// et nouvelles valeurs — permet d'afficher un journal lisible dans le Backoffice.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS kanban_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    changed_at TEXT DEFAULT (datetime('now')),
+    changes    TEXT NOT NULL
+  )
+`)
+
 // Paramètres du tableau Kanban (Phase 11/12) : 9 clés fixes.
 // On utilise une table clé/valeur plutôt qu'une table à colonnes fixes pour
 // pouvoir ajouter de nouveaux paramètres plus tard sans modifier le schéma.

@@ -47,7 +47,9 @@
   font-size: 0.9rem;
 }
 
-.elements-page__criterion input {
+/* Styles partagés : input texte ET select ont la même apparence */
+.elements-page__criterion input,
+.elements-page__criterion select {
   padding: 0.5rem 0.6rem;
   font-family: inherit;
   font-size: 0.95rem;
@@ -63,8 +65,14 @@
   color: var(--text-muted);
 }
 
-.elements-page__criterion input:focus {
+.elements-page__criterion input:focus,
+.elements-page__criterion select:focus {
   border-color: var(--accent);
+}
+
+.elements-page__criterion select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .elements-page__submit {

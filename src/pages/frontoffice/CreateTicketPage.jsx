@@ -2,22 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout.jsx'
 import { FRONTOFFICE_NAV_LINKS } from './navLinks.js'
+import { ASSET_TYPES } from '../../../shared/assetTypes.js'
 import './CreateTicketPage.css'
 
-// Mêmes types d'éléments que la page de recherche (ElementsPage) — ce sont les
-// seuls types d'"assets" gérés par ce projet, et donc les seuls associables.
-const ELEMENT_TYPES = [
-  { itemtype: 'Computer',         label: 'Ordinateurs' },
-  { itemtype: 'Monitor',          label: 'Écrans' },
-  { itemtype: 'NetworkEquipment', label: 'Équipements réseau' },
-  { itemtype: 'Peripheral',       label: 'Périphériques' },
-  { itemtype: 'Phone',            label: 'Téléphones' },
-  { itemtype: 'Printer',          label: 'Imprimantes' }
-]
-
-// Codes "type" et "urgency" du Ticket GLPI (mêmes valeurs que celles vérifiées
-// en Phase 2 pour le type ; l'urgence suit l'échelle standard à 5 niveaux de
-// GLPI — vérifiée sur un ticket existant : urgency=3 → "Moyenne").
 const TICKET_TYPES = [
   { value: 1, label: 'Incident' },
   { value: 2, label: 'Demande' }
@@ -30,66 +17,43 @@ const URGENCY_LEVELS = [
   { value: 5, label: 'Très haute' }
 ]
 
-// Clé unique d'un élément, indépendante de son type GLPI — sert à éviter les
-// doublons dans le "panier" (un Computer #46 et un Monitor #46 sont différents).
 function itemKey(item) {
   return `${item.itemtype}#${item.items_id}`
 }
 
-// onLogout : même rôle que dans DashboardPage — prévenir App que le token doit
-// repasser à null, pour que la garde de route redirige bien vers /login.
-function CreateTicketPage({ onLogout }) {
-  const token    = localStorage.getItem('access_token')
+function CreateTicketPage() {
   const navigate = useNavigate()
 
-  function logout() {
-    localStorage.removeItem('access_token')
-    onLogout()
-    navigate('/login')
-  }
-
-  // ── Champs du formulaire de ticket ──────────────────────────────────────────
   const [name,    setName]    = useState('')
   const [content, setContent] = useState('')
   const [type,    setType]    = useState(1)
   const [urgency, setUrgency] = useState(3)
 
-  // ── Recherche d'éléments à associer ─────────────────────────────────────────
-  const [searchType, setSearchType] = useState('Computer')
-  const [searchName, setSearchName] = useState('')
+  const [searchType,    setSearchType]    = useState('Computer')
+  const [searchName,    setSearchName]    = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [searching,     setSearching]     = useState(false)
 
-  // "Panier" des éléments sélectionnés — un simple tableau d'objets
-  // { itemtype, items_id, name } : tout ce qu'il faut pour l'affichage ET pour
-  // construire le corps de la requête de création.
   const [selectedItems, setSelectedItems] = useState([])
 
-  // ── Soumission ───────────────────────────────────────────────────────────────
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState(null)
 
-  // Recherche par nom (recherche "contient", même principe RSQL que ElementsPage,
-  // mais simplifiée à un seul critère — ici on cherche QUOI associer, pas une
-  // exploration multicritère du parc).
+  // Recherche d'éléments à associer — utilise la même route v1 que la page Éléments
+  // (session serveur, pas de token utilisateur, réponse { ok, items: [{id, name, ...}] }).
   async function handleSearch(event) {
     event.preventDefault()
     setSearching(true)
     setSearchResults(null)
 
-    const params = new URLSearchParams({ limit: '20' })
+    const params = new URLSearchParams({ itemtype: searchType })
     const trimmed = searchName.trim()
-    if (trimmed) {
-      const escaped = trimmed.replace(/"/g, '\\"')
-      params.set('filter', `name=like="*${escaped}*"`)
-    }
+    if (trimmed) params.set('name', trimmed)
 
     try {
-      const response = await fetch(`/api/glpi/Assets/${searchType}?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const body = await response.json()
-      setSearchResults(response.ok ? body : [])
+      const response = await fetch(`http://localhost:3001/api/frontoffice/elements?${params}`)
+      const data = await response.json().catch(() => ({}))
+      setSearchResults(data.ok ? data.items : [])
     } catch {
       setSearchResults([])
     } finally {
@@ -101,7 +65,7 @@ function CreateTicketPage({ onLogout }) {
     const candidate = { itemtype: searchType, items_id: element.id, name: element.name }
     setSelectedItems(current =>
       current.some(item => itemKey(item) === itemKey(candidate))
-        ? current                          // déjà présent : on ne duplique pas
+        ? current
         : [...current, candidate]
     )
   }
@@ -116,28 +80,20 @@ function CreateTicketPage({ onLogout }) {
     setSubmitError(null)
 
     try {
+      // Session v1 serveur — ticket + associations journalisés pour la réinitialisation.
       const response = await fetch('/api/frontoffice/tickets', {
         method:  'POST',
-        headers: {
-          Authorization:  `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name, content, type, urgency,
           items: selectedItems.map(({ itemtype, items_id }) => ({ itemtype, items_id }))
         })
       })
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
       if (!data.ok) {
-        // Le détail technique part dans la console — l'utilisateur ne voit
-        // qu'un message en texte clair (pas de JSON brut à l'écran).
         console.error('Échec de la création du ticket :', data.error)
         throw new Error('La création du ticket a échoué. Vérifiez les champs et réessayez.')
       }
-
-      // Ticket créé : direction la fiche détail pour voir le résultat (la même
-      // page que celle du Backoffice fonctionnerait aussi, mais on reste dans
-      // le périmètre FrontOffice — on revient simplement au tableau de bord).
       navigate('/')
     } catch (err) {
       setSubmitError(err.message)
@@ -150,8 +106,6 @@ function CreateTicketPage({ onLogout }) {
     <Layout
       title="NewApp GLPI"
       navLinks={FRONTOFFICE_NAV_LINKS}
-      actionLabel="Déconnexion"
-      onAction={logout}
     >
     <div className="create-ticket-page">
       <h1>Créer un ticket</h1>
@@ -186,7 +140,6 @@ function CreateTicketPage({ onLogout }) {
           </label>
         </div>
 
-        {/* ── Association d'éléments ──────────────────────────────────────────── */}
         <section className="create-ticket-page__items">
           <h2>Éléments concernés</h2>
           <p className="create-ticket-page__items-intro">Recherchez et ajoutez un ou plusieurs éléments concernés par ce ticket.</p>
@@ -195,7 +148,7 @@ function CreateTicketPage({ onLogout }) {
             <label>
               Type d'élément
               <select value={searchType} onChange={e => setSearchType(e.target.value)}>
-                {ELEMENT_TYPES.map(({ itemtype, label }) => <option key={itemtype} value={itemtype}>{label}</option>)}
+                {ASSET_TYPES.map(({ itemtype, label }) => <option key={itemtype} value={itemtype}>{label}</option>)}
               </select>
             </label>
             <label>

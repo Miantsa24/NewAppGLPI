@@ -154,3 +154,84 @@
   color: var(--text-muted);
   cursor: not-allowed;
 }
+
+/* ── Historique des modifications ─────────────────────────────────────────── */
+.kanban-settings-page__history {
+  margin-top: 2.5rem;
+}
+
+.kanban-settings-page__history h2 {
+  font-size: 1.1rem;
+  color: var(--text-h);
+  margin-bottom: 0.25rem;
+}
+
+.kanban-settings-page__history-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.kanban-settings-page__history-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kanban-settings-page__history-entry {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.kanban-settings-page__history-date {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.kanban-settings-page__history-changes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.kanban-settings-page__history-change {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.kanban-settings-page__history-field {
+  min-width: 160px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.kanban-settings-page__history-value {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+/* Petit carré de couleur affiché à côté du code hex dans l'historique */
+.kanban-settings-page__swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.15);
+  vertical-align: middle;
+  flex-shrink: 0;
+}

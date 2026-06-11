@@ -75,27 +75,53 @@
   cursor: not-allowed;
 }
 
-.import-page__progress {
-  height: 6px;
+/* ── Conteneur de progression ─────────────────────────────────────────────── */
+.import-page__progress-wrap {
   margin-top: 1.5rem;
+}
+
+.import-page__step-label {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0 0 0.4rem;
+}
+
+.import-page__progress {
+  height: 8px;
   background: var(--surface-2);
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
-/* Barre indéterminée : un segment plus court que le conteneur glisse de
-   gauche à droite en boucle — il n'y a pas de pourcentage réel à afficher. */
+/* Barre déterminée : la largeur est fixée par le style inline "width: X%".
+   La transition CSS rend le remplissage progressif et fluide. */
 .import-page__progress-bar {
   height: 100%;
-  width: 35%;
   background: var(--accent);
-  border-radius: 3px;
-  animation: import-progress-slide 1.2s ease-in-out infinite;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  width: 0%;
 }
 
-@keyframes import-progress-slide {
+/* Variante indéterminée : affichée tant qu'aucun événement SSE n'est arrivé.
+   Un segment glisse de gauche à droite pour montrer que "quelque chose se passe". */
+.import-page__progress-bar--indeterminate {
+  width: 35% !important;
+  animation: import-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes import-slide {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(385%); }
+}
+
+.import-page__percent {
+  display: block;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 0.3rem;
 }
 
 .import-page__result {

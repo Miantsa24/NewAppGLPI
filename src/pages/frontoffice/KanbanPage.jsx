@@ -4,27 +4,18 @@ import Layout from '../../components/Layout.jsx'
 import { FRONTOFFICE_NAV_LINKS } from './navLinks.js'
 import './KanbanPage.css'
 
-// GLPI utilise des codes entiers pour les statuts de ticket :
-//   1 = Nouveau, 2 = En cours (attribué), 3 = En cours (planifié),
-//   4 = En attente, 5 = Résolu, 6 = Clos.
-// On les regroupe en 3 colonnes visuelles.
-// "targetStatus" : le statut GLPI qu'on envoie quand on y dépose un ticket.
 const COLUMN_DEFS = [
   { key: 'nouveau',     glpiStatuses: [1],       targetStatus: 1 },
   { key: 'in_progress', glpiStatuses: [2, 3, 4], targetStatus: 2 },
   { key: 'termine',     glpiStatuses: [5, 6],    targetStatus: 5 }
 ]
 
-// Retrouve la clé de colonne correspondant à un statut GLPI donné.
 function columnKeyFor(status) {
   if (status === 1) return 'nouveau'
   if ([2, 3, 4].includes(status)) return 'in_progress'
   return 'termine'
 }
 
-// Retourne le libellé à afficher pour une colonne selon la langue active.
-// Fallback : si le label malgache n'est pas configuré (chaîne vide),
-// on retombe sur le label français — configuré via le Backoffice.
 function labelFor(settings, key, lang) {
   if (lang === 'mg') {
     const mg = settings[`label_mg_${key}`]
@@ -34,9 +25,6 @@ function labelFor(settings, key, lang) {
 }
 
 // ── Modale : saisie de solution (obligatoire pour passer en "Terminé") ────────
-// GLPI exige une solution pour passer un ticket en Résolu (statut 5) — on ne
-// peut pas juste PATCH le statut sans l'accompagner d'un contenu de solution.
-// Cette modale collecte ce contenu avant d'envoyer la requête.
 function SolveModal({ onConfirm, onCancel }) {
   const [text, setText] = useState('')
 
@@ -76,53 +64,7 @@ function SolveModal({ onConfirm, onCancel }) {
   )
 }
 
-// ── Modale : création d'un nouveau ticket ─────────────────────────────────────
-// Formulaire minimal (Titre + Description) placé directement sur le Kanban —
-// pas besoin de quitter la page pour créer un ticket rapide.
-function AddModal({ onConfirm, onCancel, submitting }) {
-  const [name,    setName]    = useState('')
-  const [content, setContent] = useState('')
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    onConfirm({ name, content })
-  }
-
-  return (
-    <div className="kanban-modal-backdrop" onClick={onCancel}>
-      <div className="kanban-modal" onClick={e => e.stopPropagation()}>
-        <h2>Nouveau ticket</h2>
-        <form onSubmit={handleSubmit}>
-          <label className="kanban-modal__field">
-            Titre
-            <input type="text" value={name} onChange={e => setName(e.target.value)} required autoFocus />
-          </label>
-          <label className="kanban-modal__field">
-            Description
-            <textarea value={content} onChange={e => setContent(e.target.value)} rows={4} required />
-          </label>
-          <div className="kanban-modal__actions">
-            <button type="button" onClick={onCancel} className="kanban-modal__btn kanban-modal__btn--cancel">
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || !name.trim() || !content.trim()}
-              className="kanban-modal__btn kanban-modal__btn--confirm"
-            >
-              {submitting ? 'Création…' : 'Créer'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 // ── Modale : détail d'un ticket ───────────────────────────────────────────────
-// Réutilise l'endpoint Backoffice existant (/api/backoffice/tickets/:id) plutôt
-// que de dupliquer la logique — ce serveur connaît déjà les traductions de codes
-// (type, statut, priorité) et les éléments associés résolus.
 function DetailModal({ ticketId, onClose }) {
   const [ticket,  setTicket]  = useState(null)
   const [loading, setLoading] = useState(true)
@@ -158,7 +100,6 @@ function DetailModal({ ticketId, onClose }) {
             </div>
 
             <h3>Description</h3>
-            {/* white-space: pre-wrap (voir CSS) : conserve les sauts de ligne GLPI */}
             <p className="kanban-modal__content">{ticket.content || '(aucune description)'}</p>
 
             {ticket.items.length > 0 && (
@@ -179,12 +120,7 @@ function DetailModal({ ticketId, onClose }) {
 }
 
 // ── Colonne du Kanban ─────────────────────────────────────────────────────────
-// Composant réutilisé pour les 3 colonnes — reçoit la couleur de fond et le
-// libellé depuis les paramètres Backoffice, les tickets depuis le composant parent.
-// La gestion du drag & drop est entièrement en HTML5 natif : pas de bibliothèque.
 function KanbanColumn({ colDef, tickets, label, bgColor, draggingId, onDragStart, onDragEnd, onDrop, onCardClick, onAddClick }) {
-  // "isDragOver" : état local pour mettre en évidence la colonne cible pendant
-  // le survol — ne concerne que cette colonne, pas le composant parent.
   const [isDragOver, setIsDragOver] = useState(false)
 
   return (
@@ -201,7 +137,6 @@ function KanbanColumn({ colDef, tickets, label, bgColor, draggingId, onDragStart
     >
       <div className="kanban-column__header">
         <h2 className="kanban-column__title">{label}</h2>
-        {/* Badge avec le nombre de tickets — mis à jour en temps réel */}
         <span className="kanban-column__count">{tickets.length}</span>
       </div>
 
@@ -212,8 +147,6 @@ function KanbanColumn({ colDef, tickets, label, bgColor, draggingId, onDragStart
             className={`kanban-card ${draggingId === ticket.id ? 'kanban-card--dragging' : ''}`}
             draggable
             onDragStart={e => {
-              // dataTransfer : le "presse-papiers" du drag & drop HTML5.
-              // On y stocke l'id du ticket pour le retrouver dans onDrop.
               e.dataTransfer.setData('ticketId', ticket.id.toString())
               e.dataTransfer.effectAllowed = 'move'
               onDragStart(ticket.id)
@@ -226,7 +159,8 @@ function KanbanColumn({ colDef, tickets, label, bgColor, draggingId, onDragStart
         ))}
       </div>
 
-      {/* Bouton "Ajouter" uniquement sur la colonne "Nouveau" */}
+      {/* Bouton "Ajouter" uniquement sur la colonne "Nouveau" — navigue vers le
+          formulaire complet de création de ticket (avec association d'éléments). */}
       {colDef.key === 'nouveau' && (
         <button className="kanban-column__add" onClick={onAddClick}>
           + Ajouter 1 ticket
@@ -237,14 +171,8 @@ function KanbanColumn({ colDef, tickets, label, bgColor, draggingId, onDragStart
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
-function KanbanPage({ onLogout }) {
+function KanbanPage() {
   const navigate = useNavigate()
-
-  function logout() {
-    localStorage.removeItem('access_token')
-    onLogout()
-    navigate('/login')
-  }
 
   const [lang,     setLang]     = useState('fr')
   const [settings, setSettings] = useState(null)
@@ -252,26 +180,13 @@ function KanbanPage({ onLogout }) {
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState(false)
 
-  // Quel ticket est en cours de glissement (pour l'effet visuel de la carte)
-  const [draggingId, setDraggingId] = useState(null)
-
-  // Modales
-  const [showAddModal,   setShowAddModal]   = useState(false)
-  const [addSubmitting,  setAddSubmitting]  = useState(false)
+  const [draggingId,    setDraggingId]    = useState(null)
   const [detailTicketId, setDetailTicketId] = useState(null)
-  const [solveTarget,    setSolveTarget]    = useState(null)  // { ticketId }
+  const [solveTarget,    setSolveTarget]    = useState(null)
 
-  // Chargement en parallèle : paramètres Kanban + liste des tickets GLPI.
-  // On lit le token DANS l'effet (pas en dehors) pour éviter un avertissement
-  // lint sur les dépendances de useEffect.
   useEffect(() => {
-    const token = localStorage.getItem('access_token')
-
     Promise.all([
       fetch('http://localhost:3001/api/kanban/settings').then(r => r.json()),
-      // Endpoint backend dédié — session v1 serveur, retourne TOUS les tickets
-      // (importés + créés par les utilisateurs), pas seulement ceux de l'utilisateur
-      // connecté (contrairement au proxy v2 qui filtre selon le token OAuth2).
       fetch('http://localhost:3001/api/frontoffice/kanban-tickets')
         .then(async r => {
           const body = await r.json().catch(() => ({ ok: false, tickets: [] }))
@@ -290,7 +205,6 @@ function KanbanPage({ onLogout }) {
       .finally(() => setLoading(false))
   }, [])
 
-  // Recharge la liste depuis GLPI si une mise à jour optimiste échoue.
   async function reloadTickets() {
     try {
       const r = await fetch('http://localhost:3001/api/frontoffice/kanban-tickets')
@@ -299,17 +213,13 @@ function KanbanPage({ onLogout }) {
     } catch { /* on garde l'état actuel */ }
   }
 
-  // ── Gestion du drop ───────────────────────────────────────────────────────
   function handleDrop(ticketIdStr, targetColKey) {
     const ticketId = parseInt(ticketIdStr, 10)
     const ticket   = tickets.find(t => t.id === ticketId)
     if (!ticket) return
-    // On ne fait rien si le ticket est déjà dans la colonne cible.
     if (columnKeyFor(ticket.status) === targetColKey) return
 
     if (targetColKey === 'termine') {
-      // Cas spécial : GLPI exige une solution pour résoudre un ticket —
-      // on ouvre la modale avant d'envoyer quoi que ce soit à l'API.
       setSolveTarget({ ticketId })
     } else {
       const colDef = COLUMN_DEFS.find(c => c.key === targetColKey)
@@ -317,12 +227,6 @@ function KanbanPage({ onLogout }) {
     }
   }
 
-  // Mise à jour optimiste : on change le statut localement AVANT la réponse
-  // serveur pour que l'interface soit instantanée. Si la requête échoue,
-  // on recharge depuis GLPI pour retrouver l'état réel.
-  // On passe par le backend v1 (pas le proxy v2) pour contourner les filtres
-  // de visibilité GLPI — l'utilisateur connecté peut ne pas avoir le droit de
-  // modifier des tickets créés par l'import (qui appartiennent à un autre compte).
   async function patchStatus(ticketId, newStatus) {
     setTickets(ts => ts.map(t => t.id === ticketId ? { ...t, status: newStatus } : t))
     try {
@@ -345,10 +249,8 @@ function KanbanPage({ onLogout }) {
   async function handleSolveConfirm(solutionText) {
     const { ticketId } = solveTarget
     setSolveTarget(null)
-    // Mise à jour optimiste vers statut 5 (Résolu)
     setTickets(ts => ts.map(t => t.id === ticketId ? { ...t, status: 5 } : t))
     try {
-      // Le backend v1 crée l'ITILSolution ET résout le ticket en un seul appel.
       const r = await fetch(`http://localhost:3001/api/frontoffice/kanban-tickets/${ticketId}/status`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -365,35 +267,6 @@ function KanbanPage({ onLogout }) {
     }
   }
 
-  async function handleAddConfirm({ name, content }) {
-    setAddSubmitting(true)
-    const token = localStorage.getItem('access_token')
-    try {
-      const r = await fetch('/api/frontoffice/tickets', {
-        method:  'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name, content, type: 1, urgency: 3, items: [] })
-      })
-      const data = await r.json()
-      if (data.ok) {
-        setShowAddModal(false)
-        // On ajoute le ticket localement avec les infos minimales connues,
-        // sans recharger toute la liste — le statut 1 = "Nouveau" par défaut.
-        setTickets(ts => [...ts, {
-          id: data.ticketId, name, status: 1, type: 1, urgency: 3,
-          date: new Date().toLocaleDateString('fr-FR')
-        }])
-      } else {
-        console.error('Échec création ticket Kanban :', data.error)
-      }
-    } catch (err) {
-      console.error('Échec création ticket Kanban :', err.message)
-    } finally {
-      setAddSubmitting(false)
-    }
-  }
-
-  // Groupe les tickets par colonne — recalculé à chaque rendu quand "tickets" change.
   const ticketsByColumn = Object.fromEntries(
     COLUMN_DEFS.map(col => [
       col.key,
@@ -405,14 +278,10 @@ function KanbanPage({ onLogout }) {
     <Layout
       title="NewApp GLPI"
       navLinks={FRONTOFFICE_NAV_LINKS}
-      actionLabel="Déconnexion"
-      onAction={logout}
     >
     <div className="kanban-page">
       <div className="kanban-page__header">
         <h1>Kanban</h1>
-        {/* Sélecteur de langue — si un label malgache n'est pas configuré,
-            le fallback sur le français s'applique automatiquement (labelFor). */}
         <div className="kanban-page__lang">
           <button
             className={`kanban-lang-btn ${lang === 'fr' ? 'kanban-lang-btn--active' : ''}`}
@@ -447,20 +316,12 @@ function KanbanPage({ onLogout }) {
               onDragEnd={() => setDraggingId(null)}
               onDrop={id => handleDrop(id, col.key)}
               onCardClick={setDetailTicketId}
-              onAddClick={() => setShowAddModal(true)}
+              onAddClick={() => navigate('/tickets/new')}
             />
           ))}
         </div>
       )}
     </div>
-
-    {showAddModal && (
-      <AddModal
-        onConfirm={handleAddConfirm}
-        onCancel={() => setShowAddModal(false)}
-        submitting={addSubmitting}
-      />
-    )}
 
     {detailTicketId !== null && (
       <DetailModal

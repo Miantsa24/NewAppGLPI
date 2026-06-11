@@ -15,39 +15,55 @@
 //   association est créée avec les identifiants SERVEUR (App-Token + user_token,
 //   v1) dans une session dédiée — comme pour le pipeline d'import.
 
-import axios from 'axios'
 import * as glpiV1 from './glpiV1Client.js'
+import db          from './db.js'
 
-const V2_URL = process.env.GLPI_API_URL
+const insertJournal = db.prepare('INSERT INTO import_journal (glpi_itemtype, glpi_id, label) VALUES (?, ?, ?)')
 
-export async function createTicketWithItems({ accessToken, name, content, type, urgency, items }) {
-  // 1. Création du ticket via v2 — "accessToken" est l'en-tête Authorization
-  //    complet ("Bearer xxx"), tel que reçu de la requête du navigateur : on le
-  //    transmet tel quel, exactement comme le fait le proxy /api/glpi.
-  const ticketResponse = await axios.post(
-    `${V2_URL}/Assistance/Ticket`,
-    { name, content, type, urgency },
-    { headers: { Authorization: accessToken, Accept: 'application/json', 'Content-Type': 'application/json' } }
-  )
-  const ticketId = ticketResponse.data.id
+// Crée un ticket via session v1 (credentials serveur, pas de token utilisateur),
+// associe les éléments sélectionnés et journalise tout pour la réinitialisation.
+// Remplace l'ancienne version v2 — inutile depuis la suppression du login FrontOffice.
+export async function createTicketWithItems({ name, content, type, urgency, items }) {
+  const sessionToken = await glpiV1.openSession()
+  try {
+    // 1. Ticket créé via v1 — même résultat que v2 mais sans token utilisateur.
+    const ticketId = await glpiV1.createItem(sessionToken, 'Ticket', {
+      name, content, type, urgency
+    })
+    insertJournal.run('Ticket', ticketId, name)
 
-  // 2. Association de chaque élément sélectionné — UNE session v1 pour toutes
-  //    les associations (même principe que runImport : ouvrir/fermer une seule
-  //    fois plutôt qu'à chaque appel).
-  if (items.length > 0) {
-    const sessionToken = await glpiV1.openSession()
-    try {
-      for (const { itemtype, items_id } of items) {
-        await glpiV1.createItem(sessionToken, 'Item_Ticket', {
-          tickets_id: ticketId,
-          itemtype,
-          items_id
-        })
-      }
-    } finally {
-      await glpiV1.closeSession(sessionToken)
+    // 2. Association ticket ↔ éléments (Item_Ticket) — v1 uniquement (absent de v2).
+    for (const { itemtype, items_id } of items) {
+      const linkId = await glpiV1.createItem(sessionToken, 'Item_Ticket', {
+        tickets_id: ticketId,
+        itemtype,
+        items_id
+      })
+      insertJournal.run('Item_Ticket', linkId, `${itemtype}#${items_id} → ticket #${ticketId}`)
     }
-  }
 
-  return ticketId
+    return ticketId
+  } finally {
+    await glpiV1.closeSession(sessionToken)
+  }
+}
+
+// Ajoute un coût (TicketCost) à un ticket existant — utilisé par la page
+// Backoffice "Ajouter un coût". Journalisé comme tout le reste pour que la
+// réinitialisation puisse le supprimer.
+export async function addTicketCost({ ticketId, name, actiontime, cost_time, cost_fixed }) {
+  const sessionToken = await glpiV1.openSession()
+  try {
+    const costId = await glpiV1.createItem(sessionToken, 'TicketCost', {
+      tickets_id: ticketId,
+      name,
+      actiontime,
+      cost_time,
+      cost_fixed
+    })
+    insertJournal.run('TicketCost', costId, `Coût "${name}" → ticket #${ticketId}`)
+    return costId
+  } finally {
+    await glpiV1.closeSession(sessionToken)
+  }
 }

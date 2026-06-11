@@ -9,12 +9,17 @@ import { runImport, resetImportedData } from './importPipeline.js'
 import { getDashboardStats } from './dashboardData.js'
 import { listTickets, getTicketDetail, listTicketsForKanban } from './ticketsData.js'
 import { listElements, getElementDetail } from './elementsData.js'
-import { getKanbanSettings, updateKanbanSettings } from './kanbanSettings.js'
-import { createTicketWithItems } from './ticketCreation.js'
+import { getKanbanSettings, updateKanbanSettings, getKanbanHistory } from './kanbanSettings.js'
+import { createTicketWithItems, addTicketCost } from './ticketCreation.js'
 import * as glpiV1 from './glpiV1Client.js'
+import { ASSET_TYPES } from '../shared/assetTypes.js'
 
 const app  = express()
 const PORT = process.env.PORT || 3001
+
+// Itemtypes affichables/créables depuis le FrontOffice — alignés sur ASSET_TYPES
+// (shared/assetTypes.js), la source unique des types d'assets affichés dans NewApp.
+const VALID_ITEMTYPES = ASSET_TYPES.map(({ itemtype }) => itemtype)
 
 // ── Middlewares globaux ────────────────────────────────────────────────────────
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
@@ -64,29 +69,39 @@ app.post('/api/backoffice/import',
   async (req, res) => {
     const files = req.files
 
-    // Vérifie que les 4 fichiers attendus sont bien arrivés avant de lancer quoi que ce soit.
-    const missing = ['feuille1', 'feuille2', 'feuille3', 'images'].filter(key => !files?.[key]?.[0])
+    // Seule la feuille 1 (éléments) est obligatoire — feuille 2 (tickets),
+    // feuille 3 (coûts) et le ZIP d'images sont optionnels (voir importPipeline.js).
+    const missing = ['feuille1'].filter(key => !files?.[key]?.[0])
     if (missing.length > 0) {
       return res.status(400).json({ ok: false, error: `Fichier(s) manquant(s) : ${missing.join(', ')}` })
     }
 
+    // SSE : on stream la progression en temps réel au lieu d'attendre la fin.
+    // Le client lit avec fetch() + ReadableStream (voir ImportPage.jsx).
+    res.writeHead(200, {
+      'Content-Type':    'text/event-stream',
+      'Cache-Control':   'no-cache',
+      'X-Accel-Buffering': 'no'   // désactive le buffering nginx si présent
+    })
+
+    function emit(data) { res.write(`data: ${JSON.stringify(data)}\n\n`) }
+
     try {
-      // .buffer : contenu brut en mémoire (Buffer Node.js).
-      // .toString('utf-8') : les CSV sont du texte → on les convertit en chaînes
-      // pour les passer au parseur csv-parse. Le ZIP, lui, reste en Buffer binaire
-      // (AdmZip sait lire directement un Buffer, pas besoin de le convertir).
       const result = await runImport({
         feuille1Csv: files.feuille1[0].buffer.toString('utf-8'),
-        feuille2Csv: files.feuille2[0].buffer.toString('utf-8'),
-        feuille3Csv: files.feuille3[0].buffer.toString('utf-8'),
-        zipBuffer:   files.images[0].buffer
+        feuille2Csv: files.feuille2?.[0]?.buffer?.toString('utf-8'),
+        feuille3Csv: files.feuille3?.[0]?.buffer?.toString('utf-8'),
+        zipBuffer:   files.images?.[0]?.buffer,
+        onProgress:  emit
       })
       console.log(`[import] Terminé : ${result.log.length} opérations journalisées`)
-      res.json(result)
+      emit({ type: 'done', ok: true, log: result.log })
     } catch (err) {
       const glpiError = err.response?.data ?? err.message
       console.error('[import] Erreur :', JSON.stringify(glpiError, null, 2))
-      res.status(500).json({ ok: false, error: glpiError })
+      emit({ type: 'done', ok: false, error: glpiError })
+    } finally {
+      res.end()
     }
   }
 )
@@ -111,14 +126,25 @@ app.get('/api/backoffice/dashboard', async (req, res) => {
 // le journal. Pas de paramètres : l'opération porte sur "tout ce que le journal
 // connaît", pas sur une sélection — d'où un simple POST sans corps.
 app.post('/api/backoffice/reset', async (req, res) => {
+  // Même pattern SSE que l'import — le client voit la suppression item par item.
+  res.writeHead(200, {
+    'Content-Type':    'text/event-stream',
+    'Cache-Control':   'no-cache',
+    'X-Accel-Buffering': 'no'
+  })
+
+  function emit(data) { res.write(`data: ${JSON.stringify(data)}\n\n`) }
+
   try {
-    const result = await resetImportedData()
+    const result = await resetImportedData({ onProgress: emit })
     console.log(`[reset] Terminé : ${result.log.length} opérations`)
-    res.json(result)
+    emit({ type: 'done', ok: true, log: result.log })
   } catch (err) {
     const glpiError = err.response?.data ?? err.message
     console.error('[reset] Erreur :', JSON.stringify(glpiError, null, 2))
-    res.status(500).json({ ok: false, error: glpiError })
+    emit({ type: 'done', ok: false, error: glpiError })
+  } finally {
+    res.end()
   }
 })
 
@@ -151,11 +177,33 @@ app.get('/api/backoffice/tickets/:id', async (req, res) => {
   }
 })
 
+// ── Backoffice : ajout d'un coût à un ticket existant ──────────────────────────
+app.post('/api/backoffice/costs', async (req, res) => {
+  try {
+    const { ticketId, name, actiontime, costTime, costFixed } = req.body
+    if (!ticketId) return res.status(400).json({ ok: false, error: 'ticketId est requis' })
+    if (!name)     return res.status(400).json({ ok: false, error: 'name est requis' })
+
+    const id = await addTicketCost({
+      ticketId,
+      name,
+      actiontime: parseInt(actiontime, 10) || 0,
+      cost_time:  parseFloat(costTime) || 0,
+      cost_fixed: parseFloat(costFixed) || 0
+    })
+    res.json({ ok: true, id })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[costs] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  }
+})
+
 // ── Pages Éléments (Backoffice) : liste + fiche détail ─────────────────────────
-// ":itemtype" couvre les 6 types d'"assets" gérés par ce projet (Computer,
-// Monitor, NetworkEquipment, Peripheral, Phone, Printer) — un seul couple de
-// routes générique, comme la recherche FrontOffice (ElementsPage) qui traite
-// déjà ces 6 types de façon uniforme (voir elementsData.js pour le détail).
+// ":itemtype" couvre les types d'"assets" affichés par ce projet (voir
+// shared/assetTypes.js : Computer, Monitor, Phone) — un seul couple de routes
+// générique, comme la recherche FrontOffice (ElementsPage) qui traite déjà ces
+// types de façon uniforme (voir elementsData.js pour le détail).
 app.get('/api/backoffice/elements/:itemtype', async (req, res) => {
   try {
     const elements = await listElements(req.params.itemtype)
@@ -200,6 +248,16 @@ app.put('/api/backoffice/kanban/settings', (req, res) => {
     res.json({ ok: true, settings })
   } catch (err) {
     console.error('[kanban/settings PUT] Erreur :', err.message)
+    res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
+app.get('/api/backoffice/kanban/history', (req, res) => {
+  try {
+    const history = getKanbanHistory()
+    res.json({ ok: true, history })
+  } catch (err) {
+    console.error('[kanban/history] Erreur :', err.message)
     res.status(500).json({ ok: false, error: err.message })
   }
 })
@@ -329,14 +387,43 @@ app.get('/api/frontoffice/kanban-tickets', async (req, res) => {
   }
 })
 
-// ── Création de ticket avec association d'éléments (FrontOffice, Phase 7) ──────
-// "Authorization" est exigé : c'est le token de l'utilisateur GLPI connecté,
-// transmis tel quel à l'API v2 pour que le ticket lui soit correctement attribué
-// (voir ticketCreation.js pour le détail de l'orchestration v2 + v1).
-app.post('/api/frontoffice/tickets', async (req, res) => {
-  const authHeader = req.headers.authorization
-  if (!authHeader) return res.status(401).json({ error: 'Token manquant' })
+// ── Création d'élément FrontOffice (session v1 serveur, journalisé) ───────────
+// Pas de token utilisateur requis — on utilise la session v1 (credentials serveur).
+// L'élément est ajouté à import_journal pour que la réinitialisation le supprime.
+app.post('/api/frontoffice/elements', async (req, res) => {
+  const { itemtype, name, serial, otherserial, comment } = req.body
 
+  if (!VALID_ITEMTYPES.includes(itemtype)) {
+    return res.status(400).json({ ok: false, error: `itemtype invalide : ${itemtype}` })
+  }
+  if (!name) {
+    return res.status(400).json({ ok: false, error: 'name est requis' })
+  }
+
+  const sessionToken = await glpiV1.openSession()
+  try {
+    const fields = { name }
+    if (serial)      fields.serial      = serial
+    if (otherserial) fields.otherserial = otherserial
+    if (comment)     fields.comment     = comment
+
+    const id = await glpiV1.createItem(sessionToken, itemtype, fields)
+    db.prepare('INSERT INTO import_journal (glpi_itemtype, glpi_id, label) VALUES (?, ?, ?)').run(itemtype, id, name)
+
+    console.log(`[frontoffice/elements POST] ${itemtype} "${name}" créé (id ${id})`)
+    res.json({ ok: true, id, name })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[frontoffice/elements POST] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  } finally {
+    await glpiV1.closeSession(sessionToken)
+  }
+})
+
+// ── Création de ticket avec association d'éléments (FrontOffice) ───────────────
+// Session v1 serveur (pas de token utilisateur) — ticket + associations journalisés.
+app.post('/api/frontoffice/tickets', async (req, res) => {
   const { name, content, type, urgency, items } = req.body
   if (!name || !content) {
     return res.status(400).json({ ok: false, error: 'name et content sont requis' })
@@ -344,7 +431,6 @@ app.post('/api/frontoffice/tickets', async (req, res) => {
 
   try {
     const ticketId = await createTicketWithItems({
-      accessToken: authHeader,
       name,
       content,
       type:    Number(type)    || 1,
@@ -357,6 +443,95 @@ app.post('/api/frontoffice/tickets', async (req, res) => {
     const glpiError = err.response?.data ?? err.message
     console.error('[frontoffice/tickets] Erreur :', JSON.stringify(glpiError, null, 2))
     res.status(500).json({ ok: false, error: glpiError })
+  }
+})
+
+// ── Recherche d'éléments FrontOffice (session v1 serveur) ─────────────────────
+// Pourquoi v1 et pas le proxy v2 ?
+// La recherche FrontOffice ne nécessite plus de login utilisateur. Le proxy v2
+// exige un Bearer token OAuth → erreur 400 sans login. On utilise une session v1
+// (credentials serveur) qui ne dépend d'aucun token côté client.
+//
+// Fonctionnement : on récupère TOUS les items du type demandé + les tables de
+// référence (Location, State, Manufacturer), on résout les IDs en noms, puis on
+// filtre en JS côté serveur — plus simple et plus fiable que du RSQL.
+app.get('/api/frontoffice/elements', async (req, res) => {
+  const { itemtype = 'Computer', name, location, status, manufacturer } = req.query
+
+  if (!VALID_ITEMTYPES.includes(itemtype)) {
+    return res.status(400).json({ ok: false, error: `itemtype invalide : ${itemtype}` })
+  }
+
+  const sessionToken = await glpiV1.openSession()
+  try {
+    // On parallélise les 4 appels GLPI pour minimiser le temps d'attente total.
+    const [items, locations, states, manufacturers] = await Promise.all([
+      glpiV1.listItems(sessionToken, itemtype),
+      glpiV1.listItems(sessionToken, 'Location'),
+      glpiV1.listItems(sessionToken, 'State'),
+      glpiV1.listItems(sessionToken, 'Manufacturer')
+    ])
+
+    // Tables de correspondance id → nom, pour résoudre les champs *_id de la v1.
+    const locationById     = new Map(locations.map(x => [x.id, x.name]))
+    const stateById        = new Map(states.map(x => [x.id, x.name]))
+    const manufacturerById = new Map(manufacturers.map(x => [x.id, x.name]))
+
+    const results = items
+      // Résolution des IDs en noms + format v2-compatible attendu par le frontend.
+      .map(item => ({
+        id:           item.id,
+        name:         item.name   ?? '',
+        serial:       item.serial ?? null,
+        location:     { name: locationById.get(item.locations_id)     ?? null },
+        status:       { name: stateById.get(item.states_id)           ?? null },
+        manufacturer: { name: manufacturerById.get(item.manufacturers_id) ?? null }
+      }))
+      // Filtrage côté serveur : chaque paramètre est optionnel.
+      // Nom : recherche "contient" (insensible à la casse).
+      // Autres : correspondance exacte (valeur choisie dans une liste déroulante).
+      .filter(item => {
+        if (name         && !item.name.toLowerCase().includes(name.toLowerCase())) return false
+        if (location     && item.location.name     !== location)     return false
+        if (status       && item.status.name       !== status)       return false
+        if (manufacturer && item.manufacturer.name !== manufacturer) return false
+        return true
+      })
+
+    res.json({ ok: true, items: results })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[frontoffice/elements] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  } finally {
+    await glpiV1.closeSession(sessionToken)
+  }
+})
+
+// ── Données de référence pour la recherche FrontOffice ────────────────────────
+// Retourne les listes d'emplacements, statuts et fabricants EXISTANTS dans GLPI
+// (via session v1 serveur, sans token utilisateur) — pour peupler les listes
+// déroulantes de la page de recherche du FrontOffice.
+app.get('/api/frontoffice/search-refs', async (req, res) => {
+  const sessionToken = await glpiV1.openSession()
+  try {
+    const [locations, states, manufacturers] = await Promise.all([
+      glpiV1.listItems(sessionToken, 'Location'),
+      glpiV1.listItems(sessionToken, 'State'),
+      glpiV1.listItems(sessionToken, 'Manufacturer')
+    ])
+    res.json({
+      ok:            true,
+      locations:     locations.map(x => x.name).filter(Boolean).sort(),
+      states:        states.map(x => x.name).filter(Boolean).sort(),
+      manufacturers: manufacturers.map(x => x.name).filter(Boolean).sort()
+    })
+  } catch (err) {
+    const glpiError = err.response?.data ?? err.message
+    console.error('[search-refs] Erreur :', JSON.stringify(glpiError, null, 2))
+    res.status(500).json({ ok: false, error: glpiError })
+  } finally {
+    await glpiV1.closeSession(sessionToken)
   }
 })
 

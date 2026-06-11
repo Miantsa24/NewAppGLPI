@@ -76,6 +76,49 @@
   font-weight: 500;
 }
 
+/* ── Groupe de liens (catégorie, liste déroulante) ────────────────────────── */
+.app-layout__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.app-layout__group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.45rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app-layout__group-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text-h);
+}
+
+.app-layout__group-arrow {
+  font-size: 0.7rem;
+}
+
+.app-layout__group-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-left: 0.5rem;
+}
+
 .app-layout__content {
   flex: 1;
   padding: 2rem;

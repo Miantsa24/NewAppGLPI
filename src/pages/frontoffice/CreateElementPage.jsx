@@ -1,43 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout.jsx'
 import { FRONTOFFICE_NAV_LINKS } from './navLinks.js'
 import './CreateElementPage.css'
 
-// Les 4 types restants une fois Ordinateur et Écran sortis dans leurs propres
-// menus — ce sont les seuls autres types d'"assets" gérés par ce projet
-// (mêmes 6 types au total que ElementsPage / CreateTicketPage).
-const OTHER_ELEMENT_TYPES = [
-  { itemtype: 'NetworkEquipment', label: 'Équipement réseau' },
-  { itemtype: 'Peripheral',       label: 'Périphérique' },
-  { itemtype: 'Phone',            label: 'Téléphone' },
-  { itemtype: 'Printer',          label: 'Imprimante' }
-]
-
-// onLogout : même rôle que dans CreateTicketPage — prévenir App que le token
-// doit repasser à null, pour que la garde de route redirige vers /login.
-//
-// "itemtype" : type GLPI fixe pour les pages dédiées (Computer, Monitor) ;
-// la valeur spéciale "others" déclenche un sélecteur parmi les 4 types restants
-// — un seul composant générique pour les trois entrées de menu, comme convenu
-// ("Une page par catégorie", avec "Autres éléments" couvrant les 4 types restants).
-function CreateElementPage({ onLogout, pageTitle, itemtype }) {
-  const token    = localStorage.getItem('access_token')
-  const navigate = useNavigate()
-
-  function logout() {
-    localStorage.removeItem('access_token')
-    onLogout()
-    navigate('/login')
-  }
-
-  const isOtherCategory = itemtype === 'others'
-  const [selectedType, setSelectedType] = useState(OTHER_ELEMENT_TYPES[0].itemtype)
-  const targetType = isOtherCategory ? selectedType : itemtype
-
-  // Champs communs aux 6 types d'"assets" (vérifiés dans la spec OpenAPI GLPI :
-  // name, comment, serial, otherserial) — les seuls qu'on demande, pour rester
-  // aussi simple qu'une création de ticket (pas de relations/listes déroulantes).
+function CreateElementPage({ pageTitle, itemtype }) {
   const [name,        setName]        = useState('')
   const [serial,      setSerial]      = useState('')
   const [otherserial, setOtherserial] = useState('')
@@ -54,28 +20,23 @@ function CreateElementPage({ onLogout, pageTitle, itemtype }) {
     setSuccess(false)
 
     try {
-      const response = await fetch(`/api/glpi/Assets/${targetType}`, {
+      // Session v1 serveur — pas de token utilisateur requis.
+      // L'élément est journalisé côté serveur pour la réinitialisation.
+      const response = await fetch('http://localhost:3001/api/frontoffice/elements', {
         method:  'POST',
-        headers: {
-          Authorization:  `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name, serial, otherserial, comment })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemtype, name, serial, otherserial, comment })
       })
-      const body = await response.json().catch(() => ({ raw: response.statusText }))
-      if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { glpi: body })
+      const data = await response.json().catch(() => ({}))
+      if (!data.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { glpi: data.error })
 
-      // Formulaire vidé : prêt pour une nouvelle saisie sans recharger la page
-      // (utile si on doit créer plusieurs éléments à la suite).
       setName('')
       setSerial('')
       setOtherserial('')
       setComment('')
       setSuccess(true)
     } catch (err) {
-      // Le détail technique part dans la console — l'utilisateur ne voit
-      // qu'un message en texte clair (pas de JSON brut à l'écran).
-      console.error(`Échec de la création (${targetType}) :`, err.message, err.glpi)
+      console.error(`Échec de la création (${itemtype}) :`, err.message, err.glpi)
       setSubmitError(true)
     } finally {
       setSubmitting(false)
@@ -86,26 +47,11 @@ function CreateElementPage({ onLogout, pageTitle, itemtype }) {
     <Layout
       title="NewApp GLPI"
       navLinks={FRONTOFFICE_NAV_LINKS}
-      actionLabel="Déconnexion"
-      onAction={logout}
     >
     <div className="create-element-page">
       <h1>{pageTitle}</h1>
 
       <form onSubmit={handleSubmit}>
-        {isOtherCategory && (
-          <div className="create-element-page__field">
-            <label>
-              Type d'élément {' '}
-              <select value={selectedType} onChange={e => setSelectedType(e.target.value)}>
-                {OTHER_ELEMENT_TYPES.map(({ itemtype: type, label }) => (
-                  <option key={type} value={type}>{label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
-
         <div className="create-element-page__field">
           <label>
             Nom
