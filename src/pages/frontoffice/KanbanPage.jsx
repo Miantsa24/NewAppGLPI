@@ -35,6 +35,7 @@ function SolveModal({ onConfirm, onCancel }) {
   const [actiontime, setActiontime] = useState('')
   const [costTime, setCostTime] = useState('')
   const [cost, setCost] = useState('')
+  
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -79,6 +80,44 @@ function SolveModal({ onConfirm, onCancel }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function ReopenModal ({onClose, onCancelCost, onReopenPercent}) {
+  const [showPercent, setShowPercent] = useState(false)
+  const [percent, setPercent] = useState('')
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (percent) onReopenPercent(percent)
+  }
+
+  return (
+    <div className="kanban-modal-backdrop" onClick={onClose}>
+      <div className="kanban-modal" onClick={e => e.stopPropagation()}>
+        <h2>Réouvrir le ticket</h2>
+        <p className="kanban-modal__desc">
+          Ce ticket a été clôturé. Quelle action voulez-vous faire ?
+        </p>
+        {!showPercent ? (
+          <div className="kanban-modal__actions">
+            <button type="button" onClick={onCancelCost} className="kanban-modal__btn kanban-modal__btn--danger">Annuler</button>
+            <button type="button" onClick={() => setShowPercent(true)} className="kanban-modal__btn kanban-modal__btn--confirm">Réouverture</button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <label className="kanban-modal__field">
+              Pourcentage du dernier coût de clôture
+              <input type="number" min="0" step="0.01" value={percent} onChange={e => setPercent(e.target.value)} placeholder="ex. 10" autoFocus required />
+            </label>
+            <div className="kanban-modal__actions">
+                <button type="button" onClick={() => setShowPercent(false)} className="kanban-modal__btn kanban-modal__btn--cancel">Retour</button>
+                <button type="submit" disabled={!percent} className="kanban-modal__btn kanban-modal__btn--confirm">Confirmer</button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )
@@ -203,6 +242,7 @@ function KanbanPage() {
   const [draggingId,    setDraggingId]    = useState(null)
   const [detailTicketId, setDetailTicketId] = useState(null)
   const [solveTarget,    setSolveTarget]    = useState(null)
+  const [reopenTarget,    setReopenTarget]    = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -241,7 +281,9 @@ function KanbanPage() {
 
     if (targetColKey === 'termine') {
       setSolveTarget({ ticketId })
-    } else {
+    } else if (targetColKey === 'in_progress' && ticket.status === 6) {
+      setReopenTarget({ ticketId})
+    }else {
       const colDef = COLUMN_DEFS.find(c => c.key === targetColKey)
       patchStatus(ticketId, colDef.targetStatus)
     }
@@ -283,6 +325,48 @@ function KanbanPage() {
       }
     } catch (err) {
       console.error('Échec résolution ticket :', err.message)
+      reloadTickets()
+    }
+  }
+
+  async function handleReopenCancelCost() {
+    const { ticketId } = reopenTarget
+    setReopenTarget(null)
+    setTickets(ts => ts.map(t => t.id === ticketId ? { ...t, status: 2 } : t))
+    try {
+      const r = await fetch(`http://localhost:3001/api/frontoffice/kanban-tickets/${ticketId}/status`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ status: 2, cancelLastCost: true })
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!data.ok) {
+        console.error('Échec réouverture ticket :', data.error)
+        reloadTickets()
+      }
+    } catch (err) {
+      console.error('Échec réouverture ticket :', err.message)
+      reloadTickets()
+    }
+  }
+
+  async function handleReopenWithPercent(percent) {
+    const { ticketId } = reopenTarget
+    setReopenTarget(null)
+    setTickets(ts => ts.map(t => t.id === ticketId ? { ...t, status: 2 } : t))
+    try {
+      const r = await fetch(`http://localhost:3001/api/frontoffice/kanban-tickets/${ticketId}/status`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ status: 2, reopenPercent: percent })
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!data.ok) {
+        console.error('Échec réouverture ticket :', data.error)
+        reloadTickets()
+      }
+    } catch (err) {
+      console.error('Échec réouverture ticket :', err.message)
       reloadTickets()
     }
   }
@@ -357,6 +441,13 @@ function KanbanPage() {
       <SolveModal
         onConfirm={handleSolveConfirm}
         onCancel={() => setSolveTarget(null)}
+      />
+    )}
+    {reopenTarget && (
+      <ReopenModal
+        onClose={() => setReopenTarget(null)}
+        onCancelCost={handleReopenCancelCost}
+        onReopenPercent={handleReopenWithPercent}
       />
     )}
     </Layout>

@@ -141,9 +141,11 @@ export async function listCostsByAsset() {
     // ticket_costs (SQLite), cost_time × actiontime/3600 + cost_fixed, sommé
     // par ticket.
     const newCostByTicket = new Map()
-    for (const row of db.prepare('SELECT ticket_id, actiontime, cost_time, cost_fixed FROM ticket_costs').all()) {
+    const reopenCostByTicket = new Map()
+    for (const row of db.prepare('SELECT ticket_id, actiontime, cost_time, cost_fixed, type FROM ticket_costs').all()) {
       const amount = Number(row.cost_time ?? 0) * Number(row.actiontime ?? 0) / 3600 + Number(row.cost_fixed ?? 0)
-      newCostByTicket.set(row.ticket_id, (newCostByTicket.get(row.ticket_id) ?? 0) + amount)
+      const target = row.type === 'reouverture' ? reopenCostByTicket : newCostByTicket
+      target.set(row.ticket_id, (target.get(row.ticket_id) ?? 0) + amount)
     }
 
     const ticketNameById = new Map(tickets.map(t => [t.id, t.name]))
@@ -152,6 +154,7 @@ export async function listCostsByAsset() {
     for (const [ticketId, items] of itemsByTicket) {
       const costImportedPerItem = (importedCostByTicket.get(ticketId) ?? 0) / items.length
       const costNewPerItem      = (newCostByTicket.get(ticketId) ?? 0) / items.length
+      const costReopeningPerItem = (reopenCostByTicket.get(ticketId) ?? 0) / items.length
 
       for (const item of items) {
         rows.push({
@@ -161,7 +164,8 @@ export async function listCostsByAsset() {
           assetId:      item.id,
           assetName:    nameByTypeAndId.get(item.itemtype)?.get(item.id) ?? `#${item.id}`,
           costImported: costImportedPerItem,
-          costNew:      costNewPerItem
+          costNew:      costNewPerItem,
+          costReopening: costReopeningPerItem 
         })
       }
     }

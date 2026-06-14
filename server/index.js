@@ -423,7 +423,7 @@ app.use('/api/glpi', async (req, res) => {
 // Body : { status: 1|2|6, solution?: "..." }  (solution requis quand status === 6)
 app.patch('/api/frontoffice/kanban-tickets/:id/status', async (req, res) => {
   const ticketId = req.params.id
-  const { status, solution, cost, actiontime, costTime } = req.body
+  const { status, solution, cost, costTime, actiontime, cancelLastCost, reopenPercent } = req.body
 
   if (!status) return res.status(400).json({ ok: false, error: 'status requis' })
 
@@ -449,12 +449,30 @@ app.patch('/api/frontoffice/kanban-tickets/:id/status', async (req, res) => {
       const costTimeRate  = parseFloat(costTime) || 0
       const actiontimeSec = parseInt(actiontime, 10) || 0
       if (costFixed > 0 || costTimeRate > 0 || actiontimeSec > 0) {
-        db.prepare('INSERT INTO ticket_costs (ticket_id, actiontime, cost_time, cost_fixed) VALUES (?, ?, ?, ?)')
+        db.prepare("INSERT INTO ticket_costs (ticket_id, actiontime, cost_time, cost_fixed, type) VALUES (?, ?, ?, ?, 'cloture')")
           .run(Number(ticketId), actiontimeSec, costTimeRate, costFixed)
       }
     } else {
       // Changement simple de statut (ex. Nouveau ↔ In progress)
       await glpiV1.updateItem(sessionToken, 'Ticket', ticketId, { status })
+
+      if (cancelLastCost) {
+        const lastClosing = db.prepare(
+          "SELECT id FROM ticket_costs WHERE ticket_id = ? AND type = 'cloture' ORDER BY id DESC LIMIT 1"
+        ).get(Number(ticketId))
+        if (lastClosing) db.prepare('DELETE FROM ticket_costs WHERE id = ?').run(lastClosing.id)
+      }else if (reopenPercent) {
+        const lastClosing = db.prepare(
+          "SELECT actiontime, cost_time, cost_fixed FROM ticket_costs WHERE ticket_id = ? AND type = 'cloture' ORDER BY id DESC LIMIT 1"
+        ).get(Number(ticketId))
+        if (lastClosing) {
+          const lastAmount = Number(lastClosing.cost_time) * Number(lastClosing.actiontime) / 3600 + Number(lastClosing.cost_fixed)
+          const reopenAmount = lastAmount * (parseFloat(reopenPercent) / 100)
+          if (reopenAmount > 0) {
+            db.prepare("INSERT INTO ticket_costs (ticket_id, actiontime, cost_time, cost_fixed, type) VALUES (?, 0, 0, ?, 'reouverture')").run(Number(ticketId), reopenAmount)
+          }
+        }
+      }
     }
     res.json({ ok: true })
   } catch (err) {

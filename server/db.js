@@ -107,6 +107,7 @@ db.exec(`
     actiontime INTEGER NOT NULL DEFAULT 0,
     cost_time REAL NOT NULL DEFAULT 0,
     cost_fixed REAL NOT NULL,
+    type TEXT NOT NULL DEFAULT 'cloture',
     created_at TEXT DEFAULT(datetime('now'))
   )
 `)
@@ -121,5 +122,14 @@ if (!ticketCostsColumns.includes('actiontime')) {
 if (!ticketCostsColumns.includes('cost_time')) {
   db.exec('ALTER TABLE ticket_costs ADD COLUMN cost_time REAL NOT NULL DEFAULT 0')
 }
+if (!ticketCostsColumns.includes('type')) {
+  db.exec("ALTER TABLE ticket_costs ADD COLUMN type TEXT NOT NULL DEFAULT 'cloture'")
+}
+
+// Migration : la colonne `type` a d'abord été ajoutée avec une affinité REAL
+// et un défaut numérique (0) au lieu de 'cloture' — les lignes déjà
+// enregistrées ont donc type=0, ce qui fait échouer les requêtes
+// WHERE type = 'cloture'. On corrige ces lignes (toutes des coûts de clôture).
+db.exec("UPDATE ticket_costs SET type = 'cloture' WHERE type = 0")
 
 export default db

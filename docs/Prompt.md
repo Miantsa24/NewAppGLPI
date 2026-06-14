@@ -161,4 +161,14 @@ manambotra page vaovao misy resaka coût: liste items(assets), coût import, co�
 - coût par types d'éléments filtre
 - raha associé @ éléments 2 ohatra ny tickets 1 de mizara 2 ny coût any na avy @ import na coût vaovao, de raha associé @ éléments 3 de mizara 3
 
-Get-ChildItem C:\Users\"Alex Rakotobe" -Recurse -File | Where-Object { $_LastWriteTime -gt (Get-Date).AddMinutes(-30) } | Sort-Object LastWriteTime -Descending | Select-Object Name, LastWriteTime, FullName
+Get-ChildItem "C:\Users\Alex Rakotobe" -Recurse -File |
+Where-Object { $_.LastWriteTime -gt (Get-Date).AddMinutes(-30) } |
+Sort-Object LastWriteTime -Descending |
+Select-Object Name, LastWriteTime, FullName
+
+ny ticket closed afaka ahembotra: afaka averina ao @ in progress
+boite de dialogue mipotra avec bouton :
+-annulation(diso izy t@ nandefa azy tatsy) donc rehefa mikitika aniny bouton iny izy an de mamafa anle coût nataony farany(annulation fafana ny super cout nataony farany) le cout ticket no miala
+-reouverture: mameno champs ray en pourcentage de refa valider de manome coût en pourcentage(pourcentage par rapport @ le coût) miampy 10% anle superpost
+ajoute dans la liste: colone frais réouverture
+ny superpost ihany no kitihana atao annulation na réouverture

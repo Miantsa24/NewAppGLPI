@@ -315,6 +315,17 @@
   cursor: not-allowed;
 }
 
+.kanban-modal__btn--danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.kanban-modal__btn--danger:hover {
+  background: var(--danger);
+  color: var(--danger);
+  color:#fff;
+}
+
 /* Bouton de fermeture (✕) en haut à droite de la modale de détail */
 .kanban-modal__close {
   position: absolute;

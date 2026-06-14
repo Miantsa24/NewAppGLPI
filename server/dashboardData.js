@@ -78,7 +78,8 @@ export async function getDashboardStats() {
     // identiques entre le Dashboard et cette page.
     const totalCostAmount        = costsByAsset.reduce((sum, c) => sum + c.costImported, 0)
     const totalNewCostAmount     = costsByAsset.reduce((sum, c) => sum + c.costNew, 0)
-    const totalGeneralCostAmount = totalCostAmount + totalNewCostAmount
+    const totalReopenCostAmount  = costsByAsset.reduce((sum, c) => sum + c.costReopening, 0)
+    const totalGeneralCostAmount = totalCostAmount + totalNewCostAmount + totalReopenCostAmount
 
     return {
       elements,
@@ -89,6 +90,7 @@ export async function getDashboardStats() {
       totalCostsCount,
       totalCostAmount,
       totalNewCostAmount,
+      totalReopenCostAmount,
       totalGeneralCostAmount
     }
   } finally {

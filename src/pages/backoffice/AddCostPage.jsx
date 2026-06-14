@@ -119,7 +119,8 @@ function BackofficeAddCostPage({ onLock }) {
     const rows = costs.filter(c => c.itemtype === itemtype)
     const imported = rows.reduce((sum, c) => sum + c.costImported, 0)
     const fresh    = rows.reduce((sum, c) => sum + c.costNew, 0)
-    return { itemtype, imported, fresh, total: imported + fresh }
+    const reopen    = rows.reduce((sum, c) => sum + (c.costReopening ?? 0), 0)
+    return { itemtype, imported, fresh, reopen, total: imported + fresh + reopen}
   })
 
   // Total général (toutes catégories confondues) — affiché uniquement quand
@@ -128,9 +129,10 @@ function BackofficeAddCostPage({ onLock }) {
     (acc, t) => ({
       imported: acc.imported + t.imported,
       fresh:    acc.fresh + t.fresh,
+      reopen:   acc.reopen + t.reopen,
       total:    acc.total + t.total
     }),
-    { imported: 0, fresh: 0, total: 0 }
+    { imported: 0, fresh: 0,reopen : 0, total: 0 }
   )
 
   return (
@@ -274,6 +276,8 @@ function BackofficeAddCostPage({ onLock }) {
                   <th>Type</th>
                   <th>Coût importé (Ar)</th>
                   <th>Nouveau coût fixe (Ar)</th>
+                  <th>Coût de réouverture (Ar)</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -284,6 +288,7 @@ function BackofficeAddCostPage({ onLock }) {
                     <td>{itemTypeLabel(cost.itemtype)}</td>
                     <td>{cost.costImported.toFixed(2)}</td>
                     <td>{cost.costNew.toFixed(2)}</td>
+                    <td>{(cost.costReopening ?? 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -301,6 +306,7 @@ function BackofficeAddCostPage({ onLock }) {
                     <th>Type</th>
                     <th>Coût importé (Ar)</th>
                     <th>Nouveau coût (Ar)</th>
+                    <th>Nouveau de réouverture (Ar)</th>
                     <th>Total (Ar)</th>
                   </tr>
                 </thead>
@@ -310,6 +316,7 @@ function BackofficeAddCostPage({ onLock }) {
                       <td>{itemTypeLabel(t.itemtype)}</td>
                       <td>{t.imported.toFixed(2)}</td>
                       <td>{t.fresh.toFixed(2)}</td>
+                      <td>{t.reopen.toFixed(2)}</td>
                       <td>{t.total.toFixed(2)}</td>
                     </tr>
                   ))}
@@ -318,6 +325,7 @@ function BackofficeAddCostPage({ onLock }) {
                       <td>Total général</td>
                       <td>{grandTotal.imported.toFixed(2)}</td>
                       <td>{grandTotal.fresh.toFixed(2)}</td>
+                      <td>{grandTotal.reopen.toFixed(2)}</td>
                       <td>{grandTotal.total.toFixed(2)}</td>
                     </tr>
                   )}

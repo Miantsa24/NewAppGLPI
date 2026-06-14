@@ -149,6 +149,7 @@ function BackofficeDashboardPage({ onLock }) {
                 <StatCard label="Coûts enregistrés" count={stats.totalCostsCount} />
                 <StatCard label="Coût total à l'import (Ar)" count={stats.totalCostAmount.toLocaleString('fr-FR')} />
                 <StatCard label="Coût total après enregistrement (Ar)" count={stats.totalNewCostAmount.toLocaleString('fr-FR')} />
+                <StatCard label="Coût total de réouverture (Ar)" count={stats.totalReopenCostAmount.toLocaleString('fr-FR')} />
                 <StatCard label="Coût total (Ar)" count={stats.totalGeneralCostAmount.toLocaleString('fr-FR')} />
               </div>
             </section>
